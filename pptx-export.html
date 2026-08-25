@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="pptx-export.css">
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="lib/jszip.min.js"></script>
+  <script src="lib/pptxgen.min.js"></script>
   <script src="pptx-export.js" defer></script>
 </head>
 <body>
@@ -23,6 +24,18 @@
     <section class="card" aria-labelledby="export-title">
       <h2 id="export-title">選択したスライドを1つのPPTXへ</h2>
       <p>左側の一覧で必要なスライドを選択してください。複数選択は <kbd>⌘</kbd> または <kbd>Shift</kbd> を押しながらクリックします。</p>
+
+      <fieldset class="mode-picker">
+        <legend>書き出し方法</legend>
+        <label class="mode-option recommended">
+          <input type="radio" name="export-mode" value="fast" checked>
+          <span><strong>高速（おすすめ）</strong><small>見た目をそのまま保存。各ページは画像になります。</small></span>
+        </label>
+        <label class="mode-option">
+          <input type="radio" name="export-mode" value="editable">
+          <span><strong>編集可能</strong><small>文字や図形を保持。大きな資料では時間がかかります。</small></span>
+        </label>
+      </fieldset>
 
       <button id="export-button" class="primary" type="button" disabled>
         <span class="button-label">選択スライドを保存</span>
@@ -49,7 +62,7 @@
       <h2>複数枚でも大丈夫です</h2>
       <ul>
         <li>選択した順ではなく、元資料内の順番で保存します。</li>
-        <li>文字、図形、表などは編集可能な状態を維持します。</li>
+        <li>普段は高速モード、内容を直す場合だけ編集可能モードがおすすめです。</li>
         <li>元のプレゼンテーションは変更しません。</li>
       </ul>
     </section>

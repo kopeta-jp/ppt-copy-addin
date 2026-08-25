@@ -14,6 +14,7 @@
     elements.downloadCard = document.getElementById("download-card");
     elements.downloadLink = document.getElementById("download-link");
     elements.downloadSummary = document.getElementById("download-summary");
+    elements.modeInputs = Array.from(document.querySelectorAll('input[name="export-mode"]'));
 
     elements.exportButton.addEventListener("click", exportSelectedSlides);
 
@@ -36,6 +37,10 @@
       showStatus("PPTX処理ライブラリを読み込めませんでした。GitHub上のlibフォルダを確認してください。", "error");
       return;
     }
+    if (typeof PptxGenJS === "undefined") {
+      showStatus("高速書き出しライブラリを読み込めませんでした。GitHub上のlibフォルダを確認してください。", "error");
+      return;
+    }
 
     state.ready = true;
     elements.exportButton.disabled = false;
@@ -56,8 +61,13 @@
         throw new UserFacingError("スライドが選択されていません。左側の一覧から1枚以上選択してください。");
       }
 
+      const mode = getExportMode();
       let blob;
-      if (selection.indexes.length === 1) {
+      if (mode === "fast") {
+        showStatus(`${selection.indexes.length}枚を高速変換しています…`, "neutral");
+        blob = await exportFastImagePresentation(selection.indexes.length);
+        setProgress(94);
+      } else if (selection.indexes.length === 1) {
         showStatus("選択スライドを書き出しています…", "neutral");
         setProgress(35);
         blob = await exportSingleSelectedSlide();
@@ -75,7 +85,7 @@
       }
 
       const fileName = makeFileName(selection.title, selection.indexes.length);
-      setDownload(blob, fileName, selection.indexes.length);
+      setDownload(blob, fileName, selection.indexes.length, mode);
       setProgress(100);
       showStatus(`${selection.indexes.length}枚を「${fileName}」として保存しました。`, "success");
 
@@ -118,6 +128,51 @@
       return result.value;
     });
     return new Blob([base64ToBytes(base64)], { type: MIME_PPTX });
+  }
+
+  async function exportFastImagePresentation(expectedCount) {
+    setProgress(12);
+    const images = await PowerPoint.run(async (context) => {
+      const selected = context.presentation.getSelectedSlides();
+      selected.load("items/index");
+      await context.sync();
+      if (selected.items.length !== expectedCount) {
+        throw new UserFacingError("選択状態が変わりました。スライドを選び直してください。");
+      }
+
+      const orderedSlides = selected.items.slice().sort((a, b) => a.index - b.index);
+      const imageResults = orderedSlides.map((slide) => slide.getImageAsBase64({ width: 1920 }));
+      await context.sync();
+      return imageResults.map((result) => result.value);
+    });
+
+    if (images.length === 0) throw new UserFacingError("スライドが選択されていません。");
+    setProgress(68);
+
+    const dimensions = getPngDimensions(images[0]);
+    const slideWidth = 10;
+    const slideHeight = slideWidth * dimensions.height / dimensions.width;
+    const output = new PptxGenJS();
+    output.defineLayout({ name: "PPTX_EXPORT_CUSTOM", width: slideWidth, height: slideHeight });
+    output.layout = "PPTX_EXPORT_CUSTOM";
+    output.author = "PPTX EXPORT";
+    output.subject = "Selected slides exported from PowerPoint";
+    output.title = "Selected slides";
+
+    images.forEach((base64) => {
+      const slide = output.addSlide();
+      slide.addImage({
+        data: `image/png;base64,${stripDataUrl(base64)}`,
+        x: 0,
+        y: 0,
+        w: slideWidth,
+        h: slideHeight
+      });
+    });
+
+    setProgress(78);
+    const result = await output.write({ outputType: "blob", compression: false });
+    return result instanceof Blob ? result : new Blob([result], { type: MIME_PPTX });
   }
 
   function getWholePresentationBytes(onProgress) {
@@ -367,11 +422,33 @@
   }
 
   function base64ToBytes(value) {
-    const base64 = value.includes(",") ? value.slice(value.indexOf(",") + 1) : value;
+    const base64 = stripDataUrl(value);
     const binary = atob(base64.replace(/\s/g, ""));
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
     return bytes;
+  }
+
+  function stripDataUrl(value) {
+    return value.includes(",") ? value.slice(value.indexOf(",") + 1) : value;
+  }
+
+  function getPngDimensions(value) {
+    const binary = atob(stripDataUrl(value).replace(/\s/g, "").slice(0, 32));
+    if (binary.length < 24 || binary.slice(1, 4) !== "PNG") {
+      throw new Error("PowerPoint returned an invalid PNG image.");
+    }
+    const byte = (index) => binary.charCodeAt(index) & 0xff;
+    const unsigned32 = (index) => ((byte(index) * 0x1000000) + (byte(index + 1) << 16) + (byte(index + 2) << 8) + byte(index + 3));
+    const width = unsigned32(16);
+    const height = unsigned32(20);
+    if (!width || !height) throw new Error("PNG dimensions are invalid.");
+    return { width, height };
+  }
+
+  function getExportMode() {
+    const selected = elements.modeInputs.find((input) => input.checked);
+    return selected ? selected.value : "fast";
   }
 
   function makeFileName(title, count) {
@@ -383,12 +460,14 @@
     return `${base}-selected-${count}-slides.pptx`;
   }
 
-  function setDownload(blob, fileName, count) {
+  function setDownload(blob, fileName, count, mode) {
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
     state.objectUrl = URL.createObjectURL(blob);
     elements.downloadLink.href = state.objectUrl;
     elements.downloadLink.download = fileName;
-    elements.downloadSummary.textContent = `${count}枚を1つの編集可能なPowerPointファイルにまとめました。`;
+    elements.downloadSummary.textContent = mode === "fast"
+      ? `${count}枚を1つのPowerPointファイルに高速でまとめました。各ページは画像です。`
+      : `${count}枚を1つの編集可能なPowerPointファイルにまとめました。`;
     elements.downloadCard.classList.remove("hidden");
   }
 
@@ -401,6 +480,7 @@
     elements.exportButton.disabled = busy || !state.ready;
     elements.exportButton.classList.toggle("busy", busy);
     elements.exportButton.querySelector(".button-label").textContent = busy ? "処理中…" : "選択スライドを保存";
+    elements.modeInputs.forEach((input) => { input.disabled = busy; });
     elements.progressWrap.classList.toggle("hidden", !busy);
     elements.progressWrap.setAttribute("aria-hidden", String(!busy));
   }

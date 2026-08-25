@@ -40,6 +40,24 @@ h2 { margin-bottom: 8px; font-size: 16px; }
 .card > p { color: #555; font-size: 13px; line-height: 1.55; }
 kbd { padding: 1px 5px; background: #f1f1f1; border: 1px solid #ccc; border-radius: 4px; font: inherit; font-size: 11px; }
 
+.mode-picker { padding: 0; margin: 14px 0; border: 0; }
+.mode-picker legend { margin-bottom: 7px; color: #444; font-size: 12px; font-weight: 600; }
+.mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px;
+  margin-bottom: 7px;
+  border: 1px solid #d6d6d6;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.mode-option:has(input:checked) { border-color: #185abd; background: #eef5ff; }
+.mode-option input { margin: 3px 0 0; accent-color: #185abd; }
+.mode-option span { display: grid; gap: 2px; }
+.mode-option strong { font-size: 13px; }
+.mode-option small { color: #666; font-size: 11px; line-height: 1.4; }
+
 button, .download-button {
   min-height: 42px;
   border-radius: 8px;
