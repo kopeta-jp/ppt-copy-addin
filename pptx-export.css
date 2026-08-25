@@ -1,0 +1,108 @@
+:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #242424;
+  background: #f5f5f5;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 260px; background: #f5f5f5; }
+.shell { padding: 20px 16px 28px; }
+
+header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  color: white;
+  background: #185abd;
+  border-radius: 10px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 2px; font-size: 20px; }
+h2 { margin-bottom: 8px; font-size: 16px; }
+.subtitle { margin-bottom: 0; color: #666; font-size: 12px; }
+
+.card {
+  padding: 16px;
+  margin-bottom: 14px;
+  background: white;
+  border: 1px solid #e1e1e1;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+.card > p { color: #555; font-size: 13px; line-height: 1.55; }
+kbd { padding: 1px 5px; background: #f1f1f1; border: 1px solid #ccc; border-radius: 4px; font: inherit; font-size: 11px; }
+
+button, .download-button {
+  min-height: 42px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:focus-visible, .download-button:focus-visible, summary:focus-visible {
+  outline: 3px solid rgb(24 90 189 / 28%);
+  outline-offset: 2px;
+}
+
+.primary {
+  position: relative;
+  width: 100%;
+  padding: 10px 16px;
+  color: white;
+  background: #185abd;
+  border: 1px solid #104a9d;
+}
+.primary:hover:not(:disabled) { background: #124fa9; }
+.primary:disabled { cursor: default; opacity: .6; }
+
+.spinner {
+  display: none;
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgb(255 255 255 / 50%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+.busy .spinner { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.progress-wrap { height: 5px; margin-top: 12px; overflow: hidden; background: #e5e5e5; border-radius: 5px; }
+.progress-bar { width: 0; height: 100%; background: #185abd; transition: width .2s ease; }
+
+.status { padding: 10px 11px; margin-top: 12px; border-radius: 7px; font-size: 12px; line-height: 1.45; }
+.status.neutral { color: #444; background: #f0f0f0; }
+.status.success { color: #145c2c; background: #e9f6ed; }
+.status.error { color: #8b1a1a; background: #fdecec; }
+
+.download-button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding: 9px 12px;
+  color: #185abd;
+  background: #fff;
+  border: 1px solid #185abd;
+  text-decoration: none;
+}
+.download-button:hover { background: #eef5ff; }
+.hint { margin: 9px 0 0 !important; color: #777 !important; font-size: 11px !important; }
+
+.note-card ul { padding-left: 20px; margin: 0; color: #555; font-size: 12px; line-height: 1.7; }
+.help { padding: 4px 2px; color: #555; font-size: 12px; }
+.help summary { cursor: pointer; font-weight: 600; }
+.help p { margin-top: 10px; line-height: 1.6; }
+.hidden { display: none; }

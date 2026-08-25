@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://appsforoffice.microsoft.com; script-src 'self' https://appsforoffice.microsoft.com; style-src 'self'; img-src 'self' data: blob:; connect-src 'self';">
+  <title>PPTX EXPORT</title>
+  <link rel="stylesheet" href="pptx-export.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="lib/jszip.min.js"></script>
+  <script src="pptx-export.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand-mark" aria-hidden="true">X</div>
+      <div>
+        <h1>PPTX EXPORT</h1>
+        <p class="subtitle">選択スライドだけを保存</p>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="export-title">
+      <h2 id="export-title">選択したスライドを1つのPPTXへ</h2>
+      <p>左側の一覧で必要なスライドを選択してください。複数選択は <kbd>⌘</kbd> または <kbd>Shift</kbd> を押しながらクリックします。</p>
+
+      <button id="export-button" class="primary" type="button" disabled>
+        <span class="button-label">選択スライドを保存</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+
+      <div id="progress-wrap" class="progress-wrap hidden" aria-hidden="true">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+
+      <div id="status" class="status neutral" role="status" aria-live="polite">
+        PowerPointに接続しています…
+      </div>
+    </section>
+
+    <section id="download-card" class="card hidden" aria-labelledby="download-title">
+      <h2 id="download-title">書き出し完了</h2>
+      <p id="download-summary"></p>
+      <a id="download-link" class="download-button" download>もう一度ダウンロード</a>
+      <p class="hint">自動で保存画面が出ない場合は、このボタンを押してください。</p>
+    </section>
+
+    <section class="card note-card">
+      <h2>複数枚でも大丈夫です</h2>
+      <ul>
+        <li>選択した順ではなく、元資料内の順番で保存します。</li>
+        <li>文字、図形、表などは編集可能な状態を維持します。</li>
+        <li>元のプレゼンテーションは変更しません。</li>
+      </ul>
+    </section>
+
+    <details class="help">
+      <summary>注意事項</summary>
+      <p>セクションと目的別スライドショーは、選択外スライドへの参照を残さないため、書き出しファイルから除外します。マクロや署名などの高度な機能を含む資料は、共有前に書き出し結果をご確認ください。</p>
+    </details>
+  </main>
+</body>
+</html>
