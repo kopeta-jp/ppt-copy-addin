@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://appsforoffice.microsoft.com; script-src 'self' https://appsforoffice.microsoft.com; style-src 'self'; img-src 'self' data:; connect-src 'self';">
+  <title>FIT TO SLIDE</title>
+  <link rel="stylesheet" href="fit-to-slide.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="fit-to-slide.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand-mark" aria-hidden="true">↗</div>
+      <div>
+        <h1>FIT TO SLIDE</h1>
+        <p class="subtitle">画像・図形をスライド全面へ</p>
+      </div>
+    </header>
+
+    <section class="card action-card" aria-labelledby="fit-title">
+      <h2 id="fit-title">選択したオブジェクト</h2>
+      <p>位置を左上に揃え、幅と高さをスライドと同じサイズにします。</p>
+      <button id="fit-to-slide" class="primary" type="button" disabled>
+        <span class="button-label">スライド全面に合わせる</span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+      <div id="status" class="status neutral" role="status" aria-live="polite">
+        PowerPointに接続しています…
+      </div>
+    </section>
+
+    <section class="card explanation" aria-labelledby="result-title">
+      <h2 id="result-title">変更内容</h2>
+      <dl>
+        <div><dt>左位置</dt><dd>0 pt</dd></div>
+        <div><dt>上位置</dt><dd>0 pt</dd></div>
+        <div><dt>幅・高さ</dt><dd>現在のスライドと同じ</dd></div>
+      </dl>
+      <p>複数選択した場合は、すべての画像・図形を同じサイズに変更します。</p>
+    </section>
+
+    <details class="help">
+      <summary>注意事項</summary>
+      <ul>
+        <li>画像の縦横比がスライドと違う場合、画像は縦または横に伸縮します。</li>
+        <li>線とプレースホルダーは変更しません。</li>
+        <li>変更後はPowerPointの「元に戻す」で戻せます。</li>
+      </ul>
+    </details>
+  </main>
+</body>
+</html>
