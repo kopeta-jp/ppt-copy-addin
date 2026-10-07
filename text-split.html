@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://appsforoffice.microsoft.com; script-src 'self' https://appsforoffice.microsoft.com; style-src 'self'; img-src 'self' data:; connect-src 'self';">
+  <title>TEXT SPLIT</title>
+  <link rel="stylesheet" href="text-split.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="text-split-core.js" defer></script>
+  <script src="text-split.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand-mark" aria-hidden="true">T</div>
+      <div>
+        <h1>TEXT SPLIT</h1>
+        <p class="subtitle">文章を独立したテキストボックスへ</p>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="split-title">
+      <h2 id="split-title">テキストボックスを1個選択</h2>
+      <p class="lead">分け方を選んでください。</p>
+
+      <button id="split-by-line" class="action-button line-button" type="button" disabled>
+        <span class="letter">A</span>
+        <span><strong>改行ごとにバラす</strong><small>1行ずつ独立させる</small></span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+
+      <button id="split-by-blank" class="action-button blank-button" type="button" disabled>
+        <span class="letter">B</span>
+        <span><strong>空行ごとにバラす</strong><small>空白行で文章を区切る</small></span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+
+      <label class="option">
+        <input id="keep-original" type="checkbox">
+        <span>元のテキストボックスを残す</span>
+      </label>
+
+      <div id="status" class="status neutral" role="status" aria-live="polite">
+        PowerPointに接続しています…
+      </div>
+    </section>
+
+    <details class="help">
+      <summary>分割後の状態</summary>
+      <ul>
+        <li>元の位置関係を基準に配置します。</li>
+        <li>フォント、文字色、太字、配置を可能な範囲で引き継ぎます。</li>
+        <li>元のボックスは通常削除します。「元に戻す」で復元できます。</li>
+      </ul>
+    </details>
+  </main>
+</body>
+</html>
