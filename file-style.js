@@ -60,8 +60,23 @@
   async function textTargets(context,shapes){
     const selected=context.presentation.getSelectedTextRangeOrNullObject();selected.load('text');await context.sync();
     if(!selected.isNullObject&&selected.text.length>0)return [selected];
-    const frames=shapes.map(s=>s.getTextFrameOrNullObject());frames.forEach(f=>f.load('hasText'));await context.sync();
-    return frames.filter(f=>!f.isNullObject&&f.hasText).map(f=>f.textRange);
+    const tableShapes=shapes.filter(s=>s.type==='Table');
+    if(tableShapes.length&&!Office.context.requirements.isSetSupported('PowerPointApi','1.9'))throw new Error('表内の文字変更にはPowerPointApi 1.9以上が必要です。PowerPointを更新してください。');
+    const frames=shapes.filter(s=>s.type!=='Table').map(s=>s.getTextFrameOrNullObject());frames.forEach(f=>f.load('hasText'));
+    const tables=tableShapes.map(s=>s.getTable());tables.forEach(t=>t.load('rowCount,columnCount'));await context.sync();
+    const ranges=frames.filter(f=>!f.isNullObject&&f.hasText).map(f=>f.textRange);
+    ranges.coveredCount=ranges.length+tables.length;
+    const cells=[];
+    for(const table of tables){
+      for(let row=0;row<table.rowCount;row++)for(let col=0;col<table.columnCount;col++){
+        const cell=table.getCellOrNullObject(row,col);cell.load('text');cells.push(cell);
+      }
+    }
+    if(cells.length)await context.sync();
+    const validCells=cells.filter(c=>!c.isNullObject);
+    for(const cell of validCells)ranges.push({font:cell.font,cell,text:cell.text});
+    ranges.tableCellCount=validCells.length;
+    return ranges;
   }
   async function selection(context){const selected=context.presentation.getSelectedShapes();selected.load('items/type');await context.sync();return selected.items;}
   const supported=s=>['GeometricShape','TextBox','Line'].includes(s.type);
@@ -77,11 +92,14 @@
       {
         const ranges=await textTargets(context,shapes);if(!ranges.length&&kind!=='colors')throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
         const property=kind==='fonts'?'name':kind==='sizes'?'size':'color';ranges.forEach(r=>r.font.load(property));await context.sync();
-        let chars=0;const fragments=[];
+        let chars=0;const fragments=[],cellFragments=[];
         for(const range of ranges){
+          if(range.cell&&range.text.length===0)continue;
           if(range.font[property])found.push(range.font[property]);
+          else if(range.cell){range.cell.load('textRuns');cellFragments.push(range.cell);}
           else {range.load('text');fragments.push(range);}
         }
+        if(cellFragments.length){await context.sync();cellFragments.forEach(cell=>cell.textRuns.forEach(run=>{if(run.font?.[property])found.push(run.font[property]);}));}
         if(fragments.length){
           await context.sync();const parts=[];
           for(const range of fragments){chars+=range.text.length;if(chars>4000)throw new Error('書式が混在した文字が4,000文字を超えています。登録したい部分を範囲選択してください。');
@@ -96,20 +114,21 @@
   }
   async function applyStyle(kind,value,target){
     const result=await PowerPoint.run(async context=>{
-      const shapes=await selection(context);let count=0,skipped=0;
+      const shapes=await selection(context);let count=0,skipped=0,tableCellCount=0;
       if(kind==='fonts'||kind==='sizes'||target==='text'){
         const ranges=await textTargets(context,shapes);if(!ranges.length)throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
         for(const range of ranges){if(kind==='fonts')range.font.name=value;else if(kind==='sizes')range.font.size=value;else range.font.color=value;count++;}
-        skipped=Math.max(0,shapes.length-ranges.length);
+        skipped=Math.max(0,shapes.length-(ranges.coveredCount??ranges.length));
+        tableCellCount=ranges.tableCellCount||0;
       }else{
         for(const shape of shapes){if(!supported(shape)||(target==='fill'&&shape.type==='Line')){skipped++;continue;}
           if(target==='fill')shape.fill.setSolidColor(value);else {shape.lineFormat.color=value;shape.lineFormat.visible=true;}count++;
         }
         if(!count)throw new Error('適用できる図形が選択されていません。');
       }
-      await context.sync();return {count,skipped};
+      await context.sync();return {count,skipped,tableCellCount};
     });
-    status(`${result.count}件に適用しました。${result.skipped?` 対象外の${result.skipped}件はスキップしました。`:''} ⌘Z で戻せます。`,'success');
+    status(`${result.count}件に適用しました。${result.tableCellCount?` 表は全${result.tableCellCount}セルに適用しました。`:''}${result.skipped?` 対象外の${result.skipped}件はスキップしました。`:''} ⌘Z で戻せます。`,'success');
   }
   document.addEventListener('DOMContentLoaded',()=>{
     $('picker').addEventListener('input',()=>{$('hex').value=$('picker').value.toUpperCase();});
