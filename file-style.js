@@ -12,16 +12,17 @@
     finally{busy=false;controls();}
   }
   function render(){
-    for(const kind of ['colors','fonts']){
+    for(const kind of ['colors','fonts','sizes']){
       const list=$(kind);list.replaceChildren();
       if(!palette[kind].length){const p=document.createElement('p');p.className='hint';p.textContent='まだ登録されていません。';list.append(p);}
       palette[kind].forEach((item,index)=>{
         const entry=document.createElement('div');entry.className='entry';
         const apply=document.createElement(kind==='colors'?'div':'button');apply.className=kind==='colors'?'color-card':'apply';
-        if(kind==='fonts')apply.title='選択したオブジェクトに適用';
+        if(kind!=='colors')apply.title='選択したオブジェクトに適用';
         if(kind==='colors'){const swatch=document.createElement('span');swatch.className='swatch';swatch.style.backgroundColor=item.value;apply.append(swatch);}
         const text=document.createElement('span');text.className='label';text.textContent=item.label;
-        const value=document.createElement('small');value.textContent=item.value;text.append(value);apply.append(text);
+        const value=document.createElement('small');value.textContent=kind==='sizes'?`${item.value} pt`:item.value;
+        if(kind!=='sizes'||item.label!==`${item.value} pt`)text.append(value);apply.append(text);
         if(kind==='colors'){
           const actions=document.createElement('div');actions.className='color-actions';
           for(const [target,label,icon] of [['text','文字','T'],['fill','塗り','■'],['line','線','□']]){
@@ -74,8 +75,8 @@
         objects.forEach(s=>{if(s.type!=='Line'&&s.fill.type==='Solid')found.push(s.fill.foregroundColor);if(s.lineFormat.visible)found.push(s.lineFormat.color);});
       }
       {
-        const ranges=await textTargets(context,shapes);if(!ranges.length&&kind==='fonts')throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
-        const property=kind==='fonts'?'name':'color';ranges.forEach(r=>r.font.load(property));await context.sync();
+        const ranges=await textTargets(context,shapes);if(!ranges.length&&kind!=='colors')throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
+        const property=kind==='fonts'?'name':kind==='sizes'?'size':'color';ranges.forEach(r=>r.font.load(property));await context.sync();
         let chars=0;const fragments=[];
         for(const range of ranges){
           if(range.font[property])found.push(range.font[property]);
@@ -90,15 +91,15 @@
       }
       return [...new Set(found.map(v=>kind==='colors'?C.color(v):v).filter(Boolean))];
     });
-    if(!values.length)throw new Error('登録できる単色またはフォントがありません。単色のオブジェクトを選ぶか、手入力してください。');
-    await refresh();let next=palette;values.forEach(v=>{next=C.add(next,kind,v,kind==='colors'?$('color-name').value:$('font-label').value);});await persist(next);
+    if(!values.length)throw new Error('登録できる色・フォント・サイズがありません。対象を選ぶか、手入力してください。');
+    await refresh();let next=palette;values.forEach(v=>{next=C.add(next,kind,v,kind==='colors'?$('color-name').value:kind==='fonts'?$('font-label').value:'');});await persist(next);
   }
   async function applyStyle(kind,value,target){
     const result=await PowerPoint.run(async context=>{
       const shapes=await selection(context);let count=0,skipped=0;
-      if(kind==='fonts'||target==='text'){
+      if(kind==='fonts'||kind==='sizes'||target==='text'){
         const ranges=await textTargets(context,shapes);if(!ranges.length)throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
-        for(const range of ranges){if(kind==='fonts')range.font.name=value;else range.font.color=value;count++;}
+        for(const range of ranges){if(kind==='fonts')range.font.name=value;else if(kind==='sizes')range.font.size=value;else range.font.color=value;count++;}
         skipped=Math.max(0,shapes.length-ranges.length);
       }else{
         for(const shape of shapes){if(!supported(shape)||(target==='fill'&&shape.type==='Line')){skipped++;continue;}
@@ -115,8 +116,10 @@
     $('hex').addEventListener('input',()=>{const color=C.color($('hex').value);if(color)$('picker').value=color;});
     $('color-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('colors',$('hex').value,$('color-name').value));});
     $('font-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('fonts',$('font-name').value,$('font-label').value));});
+    $('size-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('sizes',$('font-size').value,''));});
     $('capture-color').addEventListener('click',()=>action(()=>capture('colors')));
     $('capture-font').addEventListener('click',()=>action(()=>capture('fonts')));
+    $('capture-size').addEventListener('click',()=>action(()=>capture('sizes')));
     $('reload').addEventListener('click',()=>action(async()=>{await refresh();status('このファイルの登録情報を読み込みました。','success');}));
     Office.onReady(async info=>{
       try{
