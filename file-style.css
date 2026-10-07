@@ -1,4 +1,26 @@
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202632;background:#f4f6fa;font-size:14px}*{box-sizing:border-box}body{margin:0}main{padding:18px;max-width:520px;margin:auto}header{display:flex;align-items:center;gap:12px;margin-bottom:18px}.mark{background:#2155cd;color:white;border-radius:12px;padding:12px;font-size:24px;font-weight:700}h1{font-size:20px;margin:0}header p{margin:5px 0;color:#626d80}section{background:#fff;border:1px solid #dce2ec;border-radius:14px;padding:16px;margin:16px 0}h2{font-size:17px;margin:0 0 12px}label{display:block;margin:12px 0 6px}input,select,button{font:inherit;min-height:38px;border-radius:7px;border:1px solid #bdc8db}input,select{padding:8px;width:100%;background:#fff;color:#202632}button{cursor:pointer;padding:8px 12px;background:#fff;color:#2155cd}button:disabled{opacity:.5;cursor:default}.primary{background:#2155cd;color:#fff;border-color:#2155cd;width:100%;margin-top:10px}.row{display:flex;gap:7px;margin-top:7px}.row input{min-width:0}.row input[type=color]{width:44px;padding:3px;flex-shrink:0}.hint{font-size:12px;color:#626d80;line-height:1.65}.list{display:grid;gap:7px}.entry{display:flex;gap:6px}.entry .apply{display:flex;align-items:center;gap:9px;flex:1;text-align:left;min-width:0;color:#202632}.entry .label{overflow-wrap:anywhere}.entry small{display:block;color:#626d80;font-size:11px}.swatch{display:block;width:27px;height:27px;border:1px solid #bfc5cf;border-radius:6px;flex-shrink:0}.delete{color:#6b7280;font-size:12px}#status{background:#e9eefb;border-radius:9px;padding:12px;line-height:1.6;overflow-wrap:anywhere}#status.error{background:#fff0ec;color:#9d331a}#status.success{background:#e8f6ee;color:#236440}#status.warning{background:#fff5d8;color:#79510a}summary{cursor:pointer}details p{font-size:12px;line-height:1.7;color:#626d80}footer{text-align:center;color:#8490a3;font-size:11px;margin:20px}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #97b6ff;outline-offset:2px}
 .color-card{display:flex;align-items:center;gap:8px;flex:1;min-width:0;padding:10px 8px;border:1px solid #bdc8db;border-radius:10px}.color-card .label{flex:1;min-width:0;font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.color-card .label small{overflow:hidden;text-overflow:ellipsis;font-weight:400}.color-card .swatch{width:24px;height:32px}.color-actions{display:flex;gap:4px;flex-shrink:0}.color-action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;width:34px;padding:4px 0;font-size:11px;color:#626d80}.action-icon{font-size:13px;line-height:1.1;font-weight:600}.color-action:hover{background:#eef3ff;color:#2155cd;border-color:#2155cd}#colors .delete{padding:6px;flex-shrink:0}#colors .entry{gap:5px}@media(max-width:310px){.color-card{flex-wrap:wrap}.color-actions{margin-left:auto}main{padding:12px}section{padding:12px}}
 .size-list{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}.size-list .apply{font-size:17px;font-weight:600;justify-content:center}.size-list .delete{padding:5px}.row button[type=submit]{min-width:50px;flex-shrink:0}
+.list{margin-top:18px;gap:10px}
+#size-form + .primary{margin-top:14px}
+/* Keep field groups, actions and disclosure panels visually separated. */
+section{margin:20px 0}
+label{margin:16px 0 8px}
+form > label:first-child{margin-top:0}
+.primary + form{margin-top:18px}
+.row{gap:8px;margin-top:8px}
+input + .row{margin-top:12px}
+.primary + .primary{margin-top:14px}
+.entry{gap:8px}
+#colors .entry{gap:8px}
+.color-actions{gap:6px}
+section > details{margin-top:18px}
+details > label{margin-top:12px}
+textarea{display:block;margin-top:8px}
+#export-result:not([hidden]){margin-top:18px}
+.download-link{margin:0 0 16px}
+.storage p{margin:12px 0}
+.storage #reload{margin-top:4px}
 .download-link{display:inline-block;margin:8px 0 14px;padding:10px;border:1px solid #bdc8db;border-radius:7px;color:#2155cd;text-decoration:none}textarea{width:100%;max-width:100%;padding:8px;border:1px solid #bdc8db;border-radius:7px;font:12px ui-monospace,monospace;resize:vertical}#export-result{margin-top:10px}#import-text{margin-top:8px}
+.download-link{margin:0 0 16px}
+#import-text{margin-top:12px}
