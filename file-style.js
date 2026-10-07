@@ -99,25 +99,27 @@
     return ranges;
   }
   async function selection(context){const selected=context.presentation.getSelectedShapes();selected.load('items/type');await context.sync();return selected.items;}
-  async function heightFitTargets(context,ranges){
+  async function textSizeTargets(context,ranges){
     const targets=[];
     for(const range of ranges){
       if(range.cell)continue;
       const frame=range.getParentTextFrame(),shape=frame.getParentShape();
-      shape.load('type,width,left,top');targets.push({frame,shape});
+      shape.load('type,width,height,left,top');targets.push({frame,shape});
     }
     if(targets.length)await context.sync();
-    return targets.filter(t=>['TextBox','GeometricShape'].includes(t.shape.type)).map(t=>({...t,width:t.shape.width,left:t.shape.left,top:t.shape.top}));
+    return targets.filter(t=>['TextBox','GeometricShape'].includes(t.shape.type)).map(t=>({...t,isTextBox:t.shape.type==='TextBox',width:t.shape.width,height:t.shape.height,left:t.shape.left,top:t.shape.top}));
   }
   const supported=s=>['GeometricShape','TextBox','Line'].includes(s.type);
+  const supportsFill=s=>supported(s)&&s.type!=='Line';
+  const supportsLine=s=>supported(s)||s.type==='Image';
   async function capture(kind){
     const values=await PowerPoint.run(async context=>{
       const shapes=await selection(context),found=[];
       if(kind==='colors'){
-        const objects=shapes.filter(supported);
-        objects.forEach(s=>{if(s.type!=='Line')s.fill.load('type,foregroundColor');s.lineFormat.load('visible,color');});
+        const objects=shapes.filter(supportsLine);
+        objects.forEach(s=>{if(supportsFill(s))s.fill.load('type,foregroundColor');s.lineFormat.load('visible,color');});
         await context.sync();
-        objects.forEach(s=>{if(s.type!=='Line'&&s.fill.type==='Solid')found.push(s.fill.foregroundColor);if(s.lineFormat.visible)found.push(s.lineFormat.color);});
+        objects.forEach(s=>{if(supportsFill(s)&&s.fill.type==='Solid')found.push(s.fill.foregroundColor);if(s.lineFormat.visible)found.push(s.lineFormat.color);});
       }
       {
         const ranges=await textTargets(context,shapes);if(!ranges.length&&kind!=='colors')throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
@@ -147,21 +149,37 @@
       const shapes=await selection(context);let count=0,skipped=0,tableCellCount=0,heightFitCount=0;
       if(kind==='fonts'||kind==='sizes'||target==='text'){
         const ranges=await textTargets(context,shapes);if(!ranges.length)throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
-        const fit=kind==='sizes'?await heightFitTargets(context,ranges):[];
-        for(const item of fit)item.frame.autoSizeSetting='AutoSizeNone';
+        const sizeTargets=kind==='sizes'?await textSizeTargets(context,ranges):[];
+        const fit=sizeTargets.filter(item=>item.isTextBox);
+        // Disable any previous shape-to-text fit before changing text size.
+        // Geometric shapes stay fixed; only actual text boxes get height fitting.
+        for(const item of sizeTargets)item.frame.autoSizeSetting='AutoSizeNone';
         for(const range of ranges){if(kind==='fonts')range.font.name=value;else if(kind==='sizes')range.font.size=value;else range.font.color=value;count++;}
         for(const item of fit){item.frame.wordWrap=true;item.frame.autoSizeSetting='AutoSizeShapeToFitText';}
-        if(fit.length){
+        if(sizeTargets.length){
           await context.sync();
-          // Keep the original width and anchor; native wrapping determines height.
-          for(const item of fit){item.shape.width=item.width;item.shape.left=item.left;item.shape.top=item.top;}
+          for(const item of sizeTargets){
+            item.shape.width=item.width;item.shape.left=item.left;item.shape.top=item.top;
+            if(!item.isTextBox)item.shape.height=item.height;
+          }
           heightFitCount=fit.length;
         }
         skipped=Math.max(0,shapes.length-(ranges.coveredCount??ranges.length));
         tableCellCount=ranges.tableCellCount||0;
       }else{
-        for(const shape of shapes){if(!supported(shape)||(target==='fill'&&shape.type==='Line')){skipped++;continue;}
-          if(target==='fill')shape.fill.setSolidColor(value);else {shape.lineFormat.color=value;shape.lineFormat.visible=true;}count++;
+        if(target==='line'){
+          shapes.filter(supportsLine).forEach(s=>s.lineFormat.load('visible,weight,transparency'));
+          await context.sync();
+        }
+        for(const shape of shapes){if(!(target==='fill'?supportsFill(shape):supportsLine(shape))){skipped++;continue;}
+          if(target==='fill')shape.fill.setSolidColor(value);else {
+            const line=shape.lineFormat;
+            const newLine=line.visible!==true;
+            if(newLine||!Number.isFinite(line.weight)||line.weight<=0)line.weight=1;
+            if(newLine){line.dashStyle='Solid';line.style='Single';}
+            if(newLine||!Number.isFinite(line.transparency)||line.transparency>=1)line.transparency=0;
+            line.color=value;line.visible=true;
+          }count++;
         }
         if(!count)throw new Error('適用できる図形が選択されていません。');
       }
