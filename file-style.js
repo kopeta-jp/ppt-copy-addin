@@ -17,11 +17,22 @@
       if(!palette[kind].length){const p=document.createElement('p');p.className='hint';p.textContent='まだ登録されていません。';list.append(p);}
       palette[kind].forEach((item,index)=>{
         const entry=document.createElement('div');entry.className='entry';
-        const apply=document.createElement('button');apply.className='apply';apply.title='選択したオブジェクトに適用';
+        const apply=document.createElement(kind==='colors'?'div':'button');apply.className=kind==='colors'?'color-card':'apply';
+        if(kind==='fonts')apply.title='選択したオブジェクトに適用';
         if(kind==='colors'){const swatch=document.createElement('span');swatch.className='swatch';swatch.style.backgroundColor=item.value;apply.append(swatch);}
         const text=document.createElement('span');text.className='label';text.textContent=item.label;
         const value=document.createElement('small');value.textContent=item.value;text.append(value);apply.append(text);
-        apply.addEventListener('click',()=>action(()=>applyStyle(kind,item.value)));
+        if(kind==='colors'){
+          const actions=document.createElement('div');actions.className='color-actions';
+          for(const [target,label,icon] of [['text','文字','T'],['fill','塗り','■'],['line','線','□']]){
+            const button=document.createElement('button');button.className='color-action';
+            button.title=`${item.value}を${label}に適用`;button.setAttribute('aria-label',`${item.label}を${label}に適用`);
+            const symbol=document.createElement('span');symbol.className='action-icon';symbol.textContent=icon;symbol.setAttribute('aria-hidden','true');
+            const caption=document.createElement('span');caption.textContent=label;button.append(symbol,caption);
+            button.addEventListener('click',()=>action(()=>applyStyle(kind,item.value,target)));actions.append(button);
+          }
+          apply.append(actions);
+        }else apply.addEventListener('click',()=>action(()=>applyStyle(kind,item.value)));
         const remove=document.createElement('button');remove.className='delete';remove.textContent='削除';remove.setAttribute('aria-label',item.label+'を削除');
         remove.addEventListener('click',()=>action(async()=>{await refresh();const next=C.clean(palette);const at=next[kind].findIndex(x=>x.value===item.value);if(at>=0)next[kind].splice(at,1);await persist(next);}));
         entry.append(apply,remove);list.append(entry);
@@ -54,11 +65,16 @@
   async function selection(context){const selected=context.presentation.getSelectedShapes();selected.load('items/type');await context.sync();return selected.items;}
   const supported=s=>['GeometricShape','TextBox','Line'].includes(s.type);
   async function capture(kind){
-    const target=$('target').value;
     const values=await PowerPoint.run(async context=>{
       const shapes=await selection(context),found=[];
-      if(kind==='fonts'||target==='text'){
-        const ranges=await textTargets(context,shapes);if(!ranges.length)throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
+      if(kind==='colors'){
+        const objects=shapes.filter(supported);
+        objects.forEach(s=>{if(s.type!=='Line')s.fill.load('type,foregroundColor');s.lineFormat.load('visible,color');});
+        await context.sync();
+        objects.forEach(s=>{if(s.type!=='Line'&&s.fill.type==='Solid')found.push(s.fill.foregroundColor);if(s.lineFormat.visible)found.push(s.lineFormat.color);});
+      }
+      {
+        const ranges=await textTargets(context,shapes);if(!ranges.length&&kind==='fonts')throw new Error('文字のあるオブジェクト、または文字範囲を選択してください。');
         const property=kind==='fonts'?'name':'color';ranges.forEach(r=>r.font.load(property));await context.sync();
         let chars=0;const fragments=[];
         for(const range of ranges){
@@ -71,18 +87,13 @@
             for(let i=0;i<range.text.length;i++){const p=range.getSubstring(i,1);p.font.load(property);parts.push(p);}}
           await context.sync();parts.forEach(p=>{if(p.font[property])found.push(p.font[property]);});
         }
-      }else{
-        const objects=shapes.filter(s=>supported(s)&&!(target==='fill'&&s.type==='Line'));if(!objects.length)throw new Error('図形またはテキストボックスを選択してください。');
-        objects.forEach(s=>target==='fill'?s.fill.load('type,foregroundColor'):s.lineFormat.load('visible,color'));await context.sync();
-        objects.forEach(s=>{if(target==='fill'&&s.fill.type==='Solid')found.push(s.fill.foregroundColor);if(target==='line'&&s.lineFormat.visible)found.push(s.lineFormat.color);});
       }
       return [...new Set(found.map(v=>kind==='colors'?C.color(v):v).filter(Boolean))];
     });
     if(!values.length)throw new Error('登録できる単色またはフォントがありません。単色のオブジェクトを選ぶか、手入力してください。');
     await refresh();let next=palette;values.forEach(v=>{next=C.add(next,kind,v,kind==='colors'?$('color-name').value:$('font-label').value);});await persist(next);
   }
-  async function applyStyle(kind,value){
-    const target=$('target').value;
+  async function applyStyle(kind,value,target){
     const result=await PowerPoint.run(async context=>{
       const shapes=await selection(context);let count=0,skipped=0;
       if(kind==='fonts'||target==='text'){

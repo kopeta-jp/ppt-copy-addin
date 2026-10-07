@@ -1,12 +1,13 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ファイルの色・フォント</title><link rel="stylesheet" href="file-style.css?v=1.0.0"><script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script><script defer src="file-style-core.js?v=1.0.0"></script><script defer src="file-style.js?v=1.0.0"></script></head>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ファイルの色・フォント</title><link rel="stylesheet" href="file-style.css?v=1.2.0"><script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script><script defer src="file-style-core.js?v=1.2.0"></script><script defer src="file-style.js?v=1.2.0"></script></head>
 <body><main><header><span class="mark">Aa</span><div><h1>色・フォント登録</h1><p>このファイル専用のスタイル帳</p></div></header>
 <div id="status" role="status" aria-live="polite">PowerPointに接続しています…</div>
-<section><h2>カラー</h2><label for="target">登録元／適用先</label><select id="target"><option value="fill">図形の塗り</option><option value="line">図形の線</option><option value="text">文字色</option></select>
+<section><h2>カラー</h2>
 <button id="capture-color" class="primary" disabled>選択したオブジェクトの色を登録</button>
+<p class="hint">選択中の塗り・線・文字色をまとめて登録します。同じ色は1つにまとめます。</p>
 <form id="color-form"><label for="color-name">色の名前（任意）</label><input id="color-name" maxlength="60" placeholder="メインカラー"><div class="row"><input id="picker" type="color" value="#2155CD" aria-label="色を選ぶ"><input id="hex" value="#2155CD" maxlength="7" aria-label="カラーコード"><button type="submit" disabled>追加</button></div></form>
-<p class="hint">登録色をクリックすると、選択中のオブジェクトに適用します。</p><div id="colors" class="list"></div></section>
+<p class="hint">各色の「文字・塗り・線」ボタンで、選択中のオブジェクトに直接適用します。</p><div id="colors" class="list"></div></section>
 <section><h2>フォント</h2><button id="capture-font" class="primary" disabled>選択したテキストのフォントを登録</button>
 <form id="font-form"><label for="font-name">フォント名</label><input id="font-name" maxlength="120" placeholder="例：游ゴシック"><label for="font-label">表示名（任意）</label><div class="row"><input id="font-label" maxlength="60" placeholder="本文用"><button type="submit" disabled>追加</button></div></form><p class="hint">フォントをクリックして適用。文字サイズ・太字などは維持します。</p><div id="fonts" class="list"></div></section>
 <section class="storage"><h2>ファイル内に保存</h2><p id="capacity">登録データ：0 KB</p><p class="hint">変更はその都度ファイル内へ記録します。閉じる前にPowerPointで ⌘S を押してください。</p><button id="reload" disabled>登録情報を再読み込み</button></section>
-<details><summary>使い方と対応範囲</summary><p>図形は複数選択できます。文字を範囲選択している場合、フォント・文字色は選択範囲だけに適用します。</p><p>色は単色のRGB値として登録します。画像内の色、グラデーション、表・グラフ・SmartArt内部、グループ内部は対象外です。グループを解除して個別に選択してください。</p><p>フォント名だけを保存します。利用するMacにフォントがない場合はPowerPointが代替します。フォントの購入・インストールは行いません。</p><p>同時編集では、登録変更前に再読み込みしてください。</p></details><footer>FILE STYLE · 1.0.0</footer></main></body></html>
+<details><summary>使い方と対応範囲</summary><p>図形は複数選択できます。文字を範囲選択している場合、フォント・文字色は選択範囲だけに適用します。</p><p>色は単色のRGB値として登録します。画像内の色、グラデーション、表・グラフ・SmartArt内部、グループ内部は対象外です。グループを解除して個別に選択してください。</p><p>フォント名だけを保存します。利用するMacにフォントがない場合はPowerPointが代替します。フォントの購入・インストールは行いません。</p><p>同時編集では、登録変更前に再読み込みしてください。</p></details><footer>FILE STYLE · 1.2.0</footer></main></body></html>
