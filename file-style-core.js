@@ -34,7 +34,34 @@
     if(bytes(next)>limit) throw new Error('登録データが64 KBを超えるため保存を停止しました。不要な登録を削除してください。');
     return next;
   }
-  const api={key,limit,warning,color,size,clean,bytes,add};
+  const transferLimit=262144;
+  function exportStyles(data){
+    return JSON.stringify({format:'FILE-STYLE',formatVersion:1,palette:clean(data)},null,2);
+  }
+  function parseStyles(text){
+    if(typeof text!=='string'||new TextEncoder().encode(text).length>transferLimit)throw new Error('設定ファイルは256 KB以内で読み込んでください。');
+    let raw;
+    try{raw=JSON.parse(text.replace(/^\uFEFF/,''));}catch(_){throw new Error('設定ファイルを読み込めません。FILE STYLEから書き出したJSONファイルを選んでください。');}
+    if(!raw||raw.format!=='FILE-STYLE'||raw.formatVersion!==1)throw new Error('FILE STYLEの設定ファイルではないか、未対応のバージョンです。');
+    const data=raw.palette;
+    if(!data||data.version!==1||!Array.isArray(data.colors)||!Array.isArray(data.fonts)||!Array.isArray(data.sizes))throw new Error('設定ファイルの登録情報が不正です。');
+    for(const kind of ['colors','fonts','sizes'])for(const item of data[kind]){
+      if(!item||typeof item!=='object'||Array.isArray(item)||typeof item.label!=='string'||item.label.length>60)throw new Error('設定ファイルに不正な登録項目があります。');
+      if(kind==='colors'&&!color(item.value))throw new Error('設定ファイルに不正なカラーコードがあります。');
+      if(kind==='fonts'&&(typeof item.value!=='string'||!item.value.trim()||item.value.length>120))throw new Error('設定ファイルに不正なフォント名があります。');
+      if(kind==='sizes'&&size(item.value)===null)throw new Error('設定ファイルに不正なサイズがあります。');
+    }
+    const result=clean(data);
+    if(bytes(result)>limit)throw new Error('登録データが64 KBを超えているため読み込めません。');
+    return result;
+  }
+  function mergeStyles(existing,incoming){
+    let merged=clean(existing);const before={colors:merged.colors.length,fonts:merged.fonts.length,sizes:merged.sizes.length};
+    for(const kind of ['colors','fonts','sizes'])for(const item of incoming[kind])merged=add(merged,kind,item.value,item.label);
+    const added={};for(const kind of ['colors','fonts','sizes'])added[kind]=merged[kind].length-before[kind];
+    return {palette:merged,added};
+  }
+  const api={key,limit,warning,color,size,clean,bytes,add,transferLimit,exportStyles,parseStyles,mergeStyles};
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
   root.FileStyleCore=api;
 })(typeof window!=='undefined'?window:globalThis);

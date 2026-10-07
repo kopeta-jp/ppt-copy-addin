@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   const C=window.FileStyleCore;
-  let palette=C.clean(null), ready=false, busy=false;
+  let palette=C.clean(null), ready=false, busy=false, exportUrl=null;
   const $=id=>document.getElementById(id);
   function status(message,type=''){ $('status').textContent=message;$('status').className=type; }
   function controls(){document.querySelectorAll('button').forEach(b=>b.disabled=!ready||busy);}
@@ -57,6 +57,26 @@
     status(size>=C.warning?'登録データが32 KBを超えました。容量を確認してください。閉じる前に ⌘S で保存してください。':'ファイル内に登録しました。閉じる前に ⌘S で保存してください。',size>=C.warning?'warning':'success');
   }
   async function register(kind,value,label){await refresh();await persist(C.add(palette,kind,value,label));}
+  async function exportStyles(){
+    await refresh();
+    if(exportUrl)URL.revokeObjectURL(exportUrl);
+    const text=C.exportStyles(palette);
+    exportUrl=URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));
+    const link=$('download-styles');link.href=exportUrl;link.download='file-style-styles.json';
+    $('export-result').hidden=false;$('export-json').value=text;
+    link.click();
+    status('設定ファイルの保存を開始しました。保存されない場合は「設定ファイルを保存」を押すか、下の設定テキストを利用してください。');
+  }
+  async function importText(text){
+    const incoming=C.parseStyles(text);
+    await refresh();
+    const merged=C.mergeStyles(palette,incoming);
+    const a=merged.added;
+    if(a.colors+a.fonts+a.sizes===0){status('すべて登録済みでした。登録情報は変更していません。','success');return;}
+    await persist(merged.palette);
+    const large=C.bytes(merged.palette)>=C.warning;
+    status(`読み込みました：色 ${a.colors}件・フォント ${a.fonts}件・サイズ ${a.sizes}件を追加。${large?'登録データが32 KBを超えています。容量を確認してください。':''}閉じる前に ⌘S で保存してください。`,large?'warning':'success');
+  }
   async function textTargets(context,shapes){
     const selected=context.presentation.getSelectedTextRangeOrNullObject();selected.load('text');await context.sync();
     if(!selected.isNullObject&&selected.text.length>0)return [selected];
@@ -159,6 +179,15 @@
     $('capture-font').addEventListener('click',()=>action(()=>capture('fonts')));
     $('capture-size').addEventListener('click',()=>action(()=>capture('sizes')));
     $('reload').addEventListener('click',()=>action(async()=>{await refresh();status('このファイルの登録情報を読み込みました。','success');}));
+    $('export-styles').addEventListener('click',()=>action(exportStyles));
+    $('import-styles').addEventListener('click',()=>{if(ready&&!busy)$('import-file').click();});
+    $('import-file').addEventListener('change',()=>{
+      const file=$('import-file').files[0];$('import-file').value='';
+      if(!file)return;
+      action(async()=>{if(file.size>C.transferLimit)throw new Error('設定ファイルは256 KB以内で読み込んでください。');await importText(await file.text());});
+    });
+    $('import-text').addEventListener('click',()=>action(()=>importText($('import-json').value)));
+    window.addEventListener('unload',()=>{if(exportUrl)URL.revokeObjectURL(exportUrl);});
     Office.onReady(async info=>{
       try{
         if(info.host!==Office.HostType.PowerPoint)throw new Error('PowerPointのアドインとして開いてください。');
