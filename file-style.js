@@ -14,7 +14,7 @@
   function render(){
     for(const kind of ['colors','fonts','sizes']){
       const list=$(kind);list.replaceChildren();
-      if(!palette[kind].length){const p=document.createElement('p');p.className='hint';p.textContent='まだ登録されていません。';list.append(p);}
+      if(!palette[kind].length){const p=document.createElement('p');p.className='hint';p.textContent='未登録';list.append(p);}
       palette[kind].forEach((item,index)=>{
         const entry=document.createElement('div');entry.className='entry';
         const apply=document.createElement(kind==='colors'?'div':'button');apply.className=kind==='colors'?'color-card':'apply';
@@ -39,7 +39,7 @@
         entry.append(apply,remove);list.append(entry);
       });
     }
-    const size=C.bytes(palette);$('capacity').textContent=`登録データ：約 ${(size/1024).toFixed(1)} KB（設定JSON／PPTX全体の増分ではありません）`;
+    const size=C.bytes(palette);$('capacity').textContent=`登録データ：約 ${(size/1024).toFixed(1)} KB`;
     controls();
   }
   function callback(method){return new Promise((resolve,reject)=>method(result=>result.status===Office.AsyncResultStatus.Succeeded?resolve():reject(new Error(result.error?.message||'ファイル内の登録情報にアクセスできませんでした。'))));}
@@ -65,7 +65,7 @@
     const link=$('download-styles');link.href=exportUrl;link.download='file-style-styles.json';
     $('export-result').hidden=false;$('export-json').value=text;
     link.click();
-    status('設定ファイルの保存を開始しました。保存されない場合は「設定ファイルを保存」を押すか、下の設定テキストを利用してください。');
+    status('書き出しました。','success');
   }
   async function importText(text){
     const incoming=C.parseStyles(text);
@@ -185,7 +185,7 @@
       }
       await context.sync();return {count,skipped,tableCellCount,heightFitCount};
     });
-    status(`${result.count}件に適用しました。${result.heightFitCount?` ${result.heightFitCount}個のボックスを横幅固定で高さ自動調整にしました。`:''}${result.tableCellCount?` 表は全${result.tableCellCount}セルに適用しました。`:''}${result.skipped?` 対象外の${result.skipped}件はスキップしました。`:''} ⌘Z で戻せます。`,'success');
+    status(`${result.count}件に適用。${result.tableCellCount?` 表：${result.tableCellCount}セル。`:''}${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
   }
   document.addEventListener('DOMContentLoaded',()=>{
     $('picker').addEventListener('input',()=>{$('hex').value=$('picker').value.toUpperCase();});
@@ -211,7 +211,7 @@
         if(info.host!==Office.HostType.PowerPoint)throw new Error('PowerPointのアドインとして開いてください。');
         if(!Office.context.requirements.isSetSupported('PowerPointApi','1.8'))throw new Error('PowerPointApi 1.8以上が必要です。');
         palette=C.clean(Office.context.document.settings.get(C.key));ready=true;render();
-        status('このファイルの色とフォントを登録できます。');
+        status('準備完了');
         Office.context.document.settings.addHandlerAsync(Office.EventType.SettingsChanged,()=>{if(!busy)action(async()=>{await refresh();status('登録情報を更新しました。');});},result=>{if(result.status!==Office.AsyncResultStatus.Succeeded)console.info('SettingsChanged unavailable; manual refresh supported.');});
       }catch(e){status(e.message,'error');}
     }).catch(e=>status(e.message,'error'));
