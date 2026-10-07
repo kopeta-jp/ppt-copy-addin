@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://appsforoffice.microsoft.com; script-src 'self' https://appsforoffice.microsoft.com; style-src 'self'; img-src 'self' data:; connect-src 'self';">
+  <title>SHAPE CONVERTER</title>
+  <link rel="stylesheet" href="shape-converter.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="shape-converter-core.js" defer></script>
+  <script src="shape-converter.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand-mark" aria-hidden="true">□</div>
+      <div>
+        <h1>SHAPE CONVERTER</h1>
+        <p class="subtitle">四角形と角丸四角形を相互変換</p>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="convert-title">
+      <h2 id="convert-title">図形を1個選択</h2>
+      <p class="lead">変換後もサイズ、色、線、テキスト書式を維持します。</p>
+
+      <button id="to-rounded" class="action-button" type="button" disabled>
+        <span class="shape-icon rectangle" aria-hidden="true"></span>
+        <span class="arrow" aria-hidden="true">›</span>
+        <span class="shape-icon rounded" aria-hidden="true"></span>
+        <span class="button-copy"><strong>角丸四角形にする</strong><small>正方形・長方形から変換</small></span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+
+      <button id="to-rectangle" class="action-button" type="button" disabled>
+        <span class="shape-icon rounded" aria-hidden="true"></span>
+        <span class="arrow" aria-hidden="true">›</span>
+        <span class="shape-icon rectangle" aria-hidden="true"></span>
+        <span class="button-copy"><strong>正方形／長方形にする</strong><small>角丸四角形から変換</small></span>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+
+      <div id="status" class="status neutral" role="status" aria-live="polite">
+        PowerPointに接続しています…
+      </div>
+    </section>
+
+    <details class="help">
+      <summary>保持する内容と制限</summary>
+      <ul>
+        <li>単色または塗りなし、枠線、位置、サイズ、回転、重なり順を保持します。</li>
+        <li>文字ごとのフォント、色、太字などを可能な範囲で保持します。</li>
+        <li>グラデーション、画像塗り、影などには対応していません。</li>
+        <li>変換後はPowerPointの「元に戻す」で復元できます。</li>
+      </ul>
+    </details>
+  </main>
+</body>
+</html>
