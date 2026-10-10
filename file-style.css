@@ -24,3 +24,9 @@ textarea{display:block;margin-top:8px}
 .download-link{display:inline-block;margin:8px 0 14px;padding:10px;border:1px solid #bdc8db;border-radius:7px;color:#2155cd;text-decoration:none}textarea{width:100%;max-width:100%;padding:8px;border:1px solid #bdc8db;border-radius:7px;font:12px ui-monospace,monospace;resize:vertical}#export-result{margin-top:10px}#import-text{margin-top:8px}
 .download-link{margin:0 0 16px}
 #import-text{margin-top:12px}
+.dimension-card{display:flex;align-items:center;gap:10px;flex:1;min-width:0;border:1px solid #bdc8db;border-radius:10px;padding:10px}
+.dimension-card .label{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.dimension-actions{display:flex;gap:8px;flex-shrink:0}
+.dimension-actions button{padding:8px;white-space:nowrap}
+#dimensions .delete{padding:6px;flex-shrink:0}
+@media(max-width:340px){.dimension-card{flex-wrap:wrap}.dimension-actions{width:100%}.dimension-actions button{flex:1}}

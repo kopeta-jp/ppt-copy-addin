@@ -12,17 +12,17 @@
     finally{busy=false;controls();}
   }
   function render(){
-    for(const kind of ['colors','fonts','sizes']){
+    for(const kind of ['colors','fonts','sizes','dimensions']){
       const list=$(kind);list.replaceChildren();
       if(!palette[kind].length){const p=document.createElement('p');p.className='hint';p.textContent='未登録';list.append(p);}
       palette[kind].forEach((item,index)=>{
         const entry=document.createElement('div');entry.className='entry';
-        const apply=document.createElement(kind==='colors'?'div':'button');apply.className=kind==='colors'?'color-card':'apply';
+        const apply=document.createElement(kind==='colors'||kind==='dimensions'?'div':'button');apply.className=kind==='colors'?'color-card':kind==='dimensions'?'dimension-card':'apply';
         if(kind!=='colors')apply.title='選択したオブジェクトに適用';
         if(kind==='colors'){const swatch=document.createElement('span');swatch.className='swatch';swatch.style.backgroundColor=item.value;apply.append(swatch);}
         const text=document.createElement('span');text.className='label';text.textContent=item.label;
-        const value=document.createElement('small');value.textContent=kind==='sizes'?`${item.value} pt`:item.value;
-        if(kind!=='sizes'||item.label!==`${item.value} pt`)text.append(value);apply.append(text);
+        const value=document.createElement('small');value.textContent=kind==='sizes'?`${item.value} pt`:kind==='dimensions'?`${item.value} cm`:item.value;
+        if(!['sizes','dimensions'].includes(kind)||item.label!==value.textContent)text.append(value);apply.append(text);
         if(kind==='colors'){
           const actions=document.createElement('div');actions.className='color-actions';
           for(const [target,label,icon] of [['text','文字','T'],['fill','塗り','■'],['line','線','□']]){
@@ -31,6 +31,14 @@
             const symbol=document.createElement('span');symbol.className='action-icon';symbol.textContent=icon;symbol.setAttribute('aria-hidden','true');
             const caption=document.createElement('span');caption.textContent=label;button.append(symbol,caption);
             button.addEventListener('click',()=>action(()=>applyStyle(kind,item.value,target)));actions.append(button);
+          }
+          apply.append(actions);
+        }else if(kind==='dimensions'){
+          const actions=document.createElement('div');actions.className='dimension-actions';
+          for(const [axis,label] of [['width','横幅'],['height','縦幅']]){
+            const button=document.createElement('button');button.textContent=label;
+            button.setAttribute('aria-label',`${label}を${item.value} cmに合わせる`);
+            button.addEventListener('click',()=>action(()=>applyDimension(item.value,axis)));actions.append(button);
           }
           apply.append(actions);
         }else apply.addEventListener('click',()=>action(()=>applyStyle(kind,item.value)));
@@ -72,10 +80,10 @@
     await refresh();
     const merged=C.mergeStyles(palette,incoming);
     const a=merged.added;
-    if(a.colors+a.fonts+a.sizes===0){status('すべて登録済みでした。登録情報は変更していません。','success');return;}
+    if(a.colors+a.fonts+a.sizes+a.dimensions===0){status('すべて登録済みでした。登録情報は変更していません。','success');return;}
     await persist(merged.palette);
     const large=C.bytes(merged.palette)>=C.warning;
-    status(`読み込みました：色 ${a.colors}件・フォント ${a.fonts}件・サイズ ${a.sizes}件を追加。${large?'登録データが32 KBを超えています。容量を確認してください。':''}閉じる前に ⌘S で保存してください。`,large?'warning':'success');
+    status(`追加：色 ${a.colors}・フォント ${a.fonts}・サイズ ${a.sizes}・寸法 ${a.dimensions}。${large?'登録データが32 KBを超えています。':''} ⌘Sで保存。`,large?'warning':'success');
   }
   async function textTargets(context,shapes){
     const selected=context.presentation.getSelectedTextRangeOrNullObject();selected.load('text');await context.sync();
@@ -187,12 +195,38 @@
     });
     status(`${result.count}件に適用。${result.tableCellCount?` 表：${result.tableCellCount}セル。`:''}${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
   }
+  async function applyDimension(value,axis){
+    const cm=C.dimension(value);
+    if(cm===null||!['width','height'].includes(axis))throw new Error('寸法が不正です。');
+    const result=await PowerPoint.run(async context=>{
+      const shapes=await selection(context);
+      const targets=shapes.filter(s=>['Image','GeometricShape'].includes(s.type));
+      if(!targets.length)throw new Error('画像または図形を選択してください。');
+      targets.forEach(s=>s.load('width,height,left,top'));await context.sync();
+      const plans=targets.map(shape=>{
+        const {width,height,left,top}=shape;
+        if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)throw new Error('寸法を取得できないオブジェクトがあります。');
+        const points=cm*72/2.54,factor=points/(axis==='width'?width:height);
+        const w=axis==='width'?points:width*factor,h=axis==='height'?points:height*factor;
+        if(!Number.isFinite(w)||!Number.isFinite(h)||w>4032||h>4032)throw new Error('変換後のサイズが大きすぎます。小さい数値を指定してください。');
+        return {shape,width:w,height:h,left,top};
+      });
+      const frames=plans.filter(p=>p.shape.type==='GeometricShape').map(p=>p.shape.getTextFrameOrNullObject());
+      frames.forEach(f=>f.load('hasText'));if(frames.length)await context.sync();
+      // Prevent text autofit from overriding the explicitly requested shape dimensions.
+      frames.filter(f=>!f.isNullObject&&f.hasText).forEach(f=>f.autoSizeSetting='AutoSizeNone');
+      for(const p of plans){p.shape.width=p.width;p.shape.height=p.height;p.shape.left=p.left;p.shape.top=p.top;}
+      await context.sync();return {count:plans.length,skipped:shapes.length-plans.length};
+    });
+    status(`${result.count}件の${axis==='width'?'横幅':'縦幅'}を${cm} cmに変更。${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
+  }
   document.addEventListener('DOMContentLoaded',()=>{
     $('picker').addEventListener('input',()=>{$('hex').value=$('picker').value.toUpperCase();});
     $('hex').addEventListener('input',()=>{const color=C.color($('hex').value);if(color)$('picker').value=color;});
     $('color-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('colors',$('hex').value,$('color-name').value));});
     $('font-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('fonts',$('font-name').value,$('font-label').value));});
     $('size-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('sizes',$('font-size').value,''));});
+    $('dimension-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('dimensions',$('dimension-value').value,''));});
     $('capture-color').addEventListener('click',()=>action(()=>capture('colors')));
     $('capture-font').addEventListener('click',()=>action(()=>capture('fonts')));
     $('capture-size').addEventListener('click',()=>action(()=>capture('sizes')));
