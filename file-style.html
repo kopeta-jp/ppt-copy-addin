@@ -3,8 +3,6 @@
 <body><main><header><span class="mark">Aa</span><h1>色・フォント登録</h1></header>
 <div id="status" role="status" aria-live="polite">接続中…</div>
 
-<section><h2>スライドを画像コピー</h2><button id="slide-copy" class="primary" disabled>画像としてコピー</button><div id="slide-fallback" hidden><img id="slide-preview" alt="選択スライドのPNG"><div class="slide-actions"><button id="slide-retry" disabled>再コピー</button><a id="slide-download" class="download-link">PNG保存</a></div></div></section>
-<section><h2>フォントチェック</h2><label for="audit-scope">対象</label><select id="audit-scope"><option value="all">全スライド</option><option value="current">このスライド</option></select><button id="audit-scan" class="primary" disabled>フォントを一覧表示</button><button id="audit-cancel" hidden disabled>中止</button><div id="audit-fonts"></div><div class="audit-navigation"><button id="audit-prev" disabled>前へ</button><button id="audit-next" disabled>次へ</button></div><p id="audit-position" role="status" aria-live="polite"></p></section>
 <section><h2>カラー</h2>
 <button id="capture-color" class="primary" disabled>選択オブジェクトの色を登録</button>
 
@@ -13,9 +11,11 @@
 <section><h2>フォント</h2><button id="capture-font" class="primary" disabled>選択テキストのフォントを登録</button>
 <form id="font-form"><label for="font-name">フォント名</label><input id="font-name" maxlength="120" placeholder="例：游ゴシック"><label for="font-label">表示名（任意）</label><div class="row"><input id="font-label" maxlength="60" placeholder="本文用"><button type="submit" disabled>追加</button></div></form><div id="fonts" class="list"></div></section>
 <section><h2>フォントサイズ</h2><form id="size-form"><label for="font-size">サイズ（pt）</label><div class="row"><input id="font-size" type="number" min="1" max="400" step="any" inputmode="decimal" placeholder="例：24" required><button type="submit" disabled>追加</button></div></form><button id="capture-size" class="primary" disabled>選択テキストのサイズを登録</button><div id="sizes" class="list size-list"></div></section>
+<section><h2>フォントチェック</h2><label for="audit-scope">対象</label><select id="audit-scope"><option value="all">全スライド</option><option value="current">このスライド</option></select><button id="audit-scan" class="primary" disabled>フォントを一覧表示</button><button id="audit-cancel" hidden disabled>中止</button><div id="audit-fonts"></div><div class="audit-navigation"><button id="audit-prev" disabled>前へ</button><button id="audit-next" disabled>次へ</button></div><p id="audit-position" role="status" aria-live="polite"></p></section>
 <section><h2>画像・図形のサイズ</h2><form id="dimension-form"><label for="dimension-value">寸法（cm）</label><div class="row"><input id="dimension-value" type="number" min="0.01" max="100" step="any" inputmode="decimal" placeholder="例：5" required><button type="submit" disabled>登録</button></div></form><p class="hint">縦横比を維持</p><div id="dimensions" class="list"></div></section>
+<section><h2>スライドを画像コピー</h2><button id="slide-copy" class="primary" disabled>画像としてコピー</button><div id="slide-fallback" hidden><img id="slide-preview" alt="選択スライドのPNG"><div class="slide-actions"><button id="slide-retry" disabled>再コピー</button><a id="slide-download" class="download-link">PNG保存</a></div></div></section>
 <section class="storage"><h2>保存</h2><p id="capacity">登録データ：0 KB</p><p class="hint">閉じる前に ⌘S</p><button id="reload" disabled>再読み込み</button></section>
 <section><h2>スタイルの移行</h2><button id="export-styles" class="primary" disabled>書き出す</button><button id="import-styles" class="primary" disabled>読み込む</button><input id="import-file" type="file" accept=".json,application/json" hidden>
 <div id="export-result" hidden><a id="download-styles" class="download-link">設定ファイルを保存</a><details><summary>設定テキストをコピー</summary><label for="export-json">設定テキスト</label><textarea id="export-json" readonly rows="6" spellcheck="false"></textarea></details></div>
 <details><summary>設定テキストから読み込む</summary><label for="import-json">設定テキスト</label><textarea id="import-json" rows="6" spellcheck="false" placeholder="設定テキストを貼り付け"></textarea><button id="import-text" disabled>読み込む</button></details></section>
-<footer>FILE STYLE · 1.9.0</footer></main></body></html>
+<footer>FILE STYLE · 1.9.1</footer></main></body></html>
