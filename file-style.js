@@ -1,10 +1,10 @@
 (function(){
   'use strict';
   const C=window.FileStyleCore;
-  let palette=C.clean(null), ready=false, busy=false, exportUrl=null, slideBlob=null, slideUrl=null;
+  let palette=C.clean(null), ready=false, busy=false, exportUrl=null, slideBlob=null, slideUrl=null, audit=null;
   const $=id=>document.getElementById(id);
   function status(message,type=''){ $('status').textContent=message;$('status').className=type; }
-  function controls(){document.querySelectorAll('button').forEach(b=>b.disabled=!ready||busy);$('slide-retry').disabled=!ready||busy||!slideBlob;}
+  function controls(){document.querySelectorAll('button').forEach(b=>b.disabled=!ready||busy);$('slide-retry').disabled=!ready||busy||!slideBlob;if(audit)audit.controls(ready&&!busy);}
   async function action(fn){
     if(!ready||busy)return;
     busy=true;controls();
@@ -258,6 +258,7 @@
     catch(_){$('slide-fallback').hidden=false;status('画像の右クリックまたはPNG保存を利用してください。','warning');}
   }
   document.addEventListener('DOMContentLoaded',()=>{
+    audit=window.FileStyleAudit.create({status,action});
     $('slide-copy').addEventListener('click',()=>action(copySlide));
     $('slide-retry').addEventListener('click',()=>action(retrySlide));
     $('picker').addEventListener('input',()=>{$('hex').value=$('picker').value.toUpperCase();});
