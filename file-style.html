@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ファイルの色・フォント</title><link rel="stylesheet" href="file-style.css?v=1.7.0"><script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script><script defer src="file-style-core.js?v=1.7.0"></script><script defer src="file-style.js?v=1.7.0"></script></head>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ファイルの色・フォント</title><link rel="stylesheet" href="file-style.css?v=1.8.0"><script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script><script defer src="file-style-core.js?v=1.8.0"></script><script defer src="file-style.js?v=1.8.0"></script></head>
 <body><main><header><span class="mark">Aa</span><h1>色・フォント登録</h1></header>
 <div id="status" role="status" aria-live="polite">接続中…</div>
 
+<section><h2>スライドを画像コピー</h2><button id="slide-copy" class="primary" disabled>画像としてコピー</button><div id="slide-fallback" hidden><img id="slide-preview" alt="選択スライドのPNG"><div class="slide-actions"><button id="slide-retry" disabled>再コピー</button><a id="slide-download" class="download-link">PNG保存</a></div></div></section>
 <section><h2>カラー</h2>
 <button id="capture-color" class="primary" disabled>選択オブジェクトの色を登録</button>
 
@@ -16,4 +17,4 @@
 <section><h2>スタイルの移行</h2><button id="export-styles" class="primary" disabled>書き出す</button><button id="import-styles" class="primary" disabled>読み込む</button><input id="import-file" type="file" accept=".json,application/json" hidden>
 <div id="export-result" hidden><a id="download-styles" class="download-link">設定ファイルを保存</a><details><summary>設定テキストをコピー</summary><label for="export-json">設定テキスト</label><textarea id="export-json" readonly rows="6" spellcheck="false"></textarea></details></div>
 <details><summary>設定テキストから読み込む</summary><label for="import-json">設定テキスト</label><textarea id="import-json" rows="6" spellcheck="false" placeholder="設定テキストを貼り付け"></textarea><button id="import-text" disabled>読み込む</button></details></section>
-<footer>FILE STYLE · 1.7.0</footer></main></body></html>
+<footer>FILE STYLE · 1.8.0</footer></main></body></html>

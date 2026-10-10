@@ -30,3 +30,7 @@ textarea{display:block;margin-top:8px}
 .dimension-actions button{padding:8px;white-space:nowrap}
 #dimensions .delete{padding:6px;flex-shrink:0}
 @media(max-width:340px){.dimension-card{flex-wrap:wrap}.dimension-actions{width:100%}.dimension-actions button{flex:1}}
+#slide-fallback{margin-top:18px}
+#slide-preview{display:block;width:100%;height:auto;border:1px solid #dce2ec;border-radius:7px}
+.slide-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:14px}
+.slide-actions .download-link{margin:0}

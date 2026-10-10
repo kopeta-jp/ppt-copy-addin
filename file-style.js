@@ -1,10 +1,10 @@
 (function(){
   'use strict';
   const C=window.FileStyleCore;
-  let palette=C.clean(null), ready=false, busy=false, exportUrl=null;
+  let palette=C.clean(null), ready=false, busy=false, exportUrl=null, slideBlob=null, slideUrl=null;
   const $=id=>document.getElementById(id);
   function status(message,type=''){ $('status').textContent=message;$('status').className=type; }
-  function controls(){document.querySelectorAll('button').forEach(b=>b.disabled=!ready||busy);}
+  function controls(){document.querySelectorAll('button').forEach(b=>b.disabled=!ready||busy);$('slide-retry').disabled=!ready||busy||!slideBlob;}
   async function action(fn){
     if(!ready||busy)return;
     busy=true;controls();
@@ -220,7 +220,46 @@
     });
     status(`${result.count}件の${axis==='width'?'横幅':'縦幅'}を${cm} cmに変更。${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
   }
+  function writeSlide(blobPromise){
+    if(typeof navigator==='undefined'||!navigator.clipboard||typeof navigator.clipboard.write!=='function'||typeof ClipboardItem==='undefined')throw new Error('画像コピー非対応');
+    return navigator.clipboard.write([new ClipboardItem({'image/png':blobPromise})]);
+  }
+  function clearSlide(){
+    if(slideUrl)URL.revokeObjectURL(slideUrl);
+    slideUrl=null;slideBlob=null;$('slide-fallback').hidden=true;
+    $('slide-preview').removeAttribute('src');$('slide-download').removeAttribute('href');
+  }
+  async function copySlide(){
+    clearSlide();status('画像を生成中…');
+    const rendered=PowerPoint.run(async context=>{
+      const slides=context.presentation.getSelectedSlides();slides.load('items');await context.sync();
+      if(slides.items.length!==1)throw new Error('スライドを1枚だけ選択してください。');
+      const result=slides.items[0].getImageAsBase64({width:2560});await context.sync();
+      if(!result.value)throw new Error('画像を生成できませんでした。');
+      const base64=result.value.replace(/^data:image\/png;base64,/, '').replace(/\s/g,'');
+      const binary=atob(base64),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));
+      if([137,80,78,71,13,10,26,10].some((v,i)=>bytes[i]!==v))throw new Error('PNG画像を生成できませんでした。');
+      const blob=new Blob([bytes],{type:'image/png'});
+      slideBlob=blob;slideUrl=URL.createObjectURL(blob);
+      $('slide-preview').src=slideUrl;$('slide-download').href=slideUrl;
+      $('slide-download').download=`slide-${Date.now()}.png`;
+      return blob;
+    });
+    // Invoke clipboard.write in the click turn; WebKit can accept a promised PNG.
+    let copied;
+    try{copied=Promise.resolve(writeSlide(rendered)).then(()=>true,()=>false);}catch(_){copied=Promise.resolve(false);}
+    await rendered;
+    if(await copied){status('画像をコピーしました。⌘Vで貼り付け。','success');}
+    else{$('slide-fallback').hidden=false;status('直接コピー不可。再コピー・右クリック・PNG保存を利用してください。','warning');}
+  }
+  async function retrySlide(){
+    if(!slideBlob)return;
+    try{await writeSlide(Promise.resolve(slideBlob));status('画像をコピーしました。⌘Vで貼り付け。','success');}
+    catch(_){$('slide-fallback').hidden=false;status('画像の右クリックまたはPNG保存を利用してください。','warning');}
+  }
   document.addEventListener('DOMContentLoaded',()=>{
+    $('slide-copy').addEventListener('click',()=>action(copySlide));
+    $('slide-retry').addEventListener('click',()=>action(retrySlide));
     $('picker').addEventListener('input',()=>{$('hex').value=$('picker').value.toUpperCase();});
     $('hex').addEventListener('input',()=>{const color=C.color($('hex').value);if(color)$('picker').value=color;});
     $('color-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('colors',$('hex').value,$('color-name').value));});
@@ -239,7 +278,7 @@
       action(async()=>{if(file.size>C.transferLimit)throw new Error('設定ファイルは256 KB以内で読み込んでください。');await importText(await file.text());});
     });
     $('import-text').addEventListener('click',()=>action(()=>importText($('import-json').value)));
-    window.addEventListener('unload',()=>{if(exportUrl)URL.revokeObjectURL(exportUrl);});
+    window.addEventListener('unload',()=>{if(exportUrl)URL.revokeObjectURL(exportUrl);if(slideUrl)URL.revokeObjectURL(slideUrl);});
     Office.onReady(async info=>{
       try{
         if(info.host!==Office.HostType.PowerPoint)throw new Error('PowerPointのアドインとして開いてください。');
