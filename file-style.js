@@ -21,6 +21,7 @@
         if(kind!=='colors')apply.title='選択したオブジェクトに適用';
         if(kind==='colors'){const swatch=document.createElement('span');swatch.className='swatch';swatch.style.backgroundColor=item.value;apply.append(swatch);}
         const text=document.createElement('span');text.className='label';text.textContent=item.label;
+        if(kind==='roundings')text.textContent+=item.mode==='radius'?` · 半径 ${(item.value*25.4/72).toFixed(2)} mm`:'（旧・再登録）';
         const value=document.createElement('small');value.textContent=kind==='sizes'?`${item.value} pt`:kind==='dimensions'?`${item.value} cm`:item.value;
         if(kind!=='roundings'&&(!['sizes','dimensions'].includes(kind)||item.label!==value.textContent))text.append(value);apply.append(text);
         if(kind==='colors'){
@@ -41,9 +42,9 @@
             button.addEventListener('click',()=>action(()=>applyDimension(item.value,axis)));actions.append(button);
           }
           apply.append(actions);
-        }else apply.addEventListener('click',()=>action(()=>kind==='roundings'?applyRounding(item.value):applyStyle(kind,item.value)));
+        }else apply.addEventListener('click',()=>action(()=>kind==='roundings'?applyRounding(item):applyStyle(kind,item.value)));
         const remove=document.createElement('button');remove.className='delete';remove.textContent='削除';remove.setAttribute('aria-label',item.label+'を削除');
-        remove.addEventListener('click',()=>action(async()=>{await refresh();const next=C.clean(palette);const at=next[kind].findIndex(x=>x.value===item.value);if(at>=0)next[kind].splice(at,1);await persist(next);}));
+        remove.addEventListener('click',()=>action(async()=>{await refresh();const next=C.clean(palette);const at=next[kind].findIndex(x=>x.value===item.value&&(kind!=='roundings'||x.mode===item.mode));if(at>=0)next[kind].splice(at,1);await persist(next);}));
         entry.append(apply,remove);list.append(entry);
       });
     }
@@ -225,7 +226,7 @@
     const shapes=await selection(context);
     const geometric=shapes.filter(s=>s.type==='GeometricShape');
     geometric.forEach(s=>s.load('id,name,width,height,left,top,rotation,zOrderPosition'));await context.sync();
-    const rounded=[];
+    const rounded=[],geometry=new Map();
     if(geometric.length){
       if(typeof JSZip==='undefined')throw new Error('角丸判定用のファイルがありません。file-style-jszip.min.jsをアップしてください。');
       // Office.js does not expose the preset geometry of an existing shape.
@@ -250,7 +251,9 @@
           const props=element(node,'cNvPr'),geom=element(node,'prstGeom'),transform=element(node,'xfrm');
           const off=transform&&element(transform,'off'),ext=transform&&element(transform,'ext');
           const box=off&&ext?{left:Number(off.getAttribute('x'))/12700,top:Number(off.getAttribute('y'))/12700,width:Number(ext.getAttribute('cx'))/12700,height:Number(ext.getAttribute('cy'))/12700}:null;
-          return {id:props?.getAttribute('id'),name:props?.getAttribute('name'),preset:node.localName==='sp'?geom?.getAttribute('prst'):null,box,zOrder};
+          const guide=geom&&Array.from(geom.getElementsByTagName('*')).find(n=>n.localName==='gd'&&n.getAttribute('name')==='adj');
+          const formula=guide?.getAttribute('fmla'),adjustment=guide&&/^val\s+-?\d+(\.\d+)?$/.test(formula||'')?Number(formula.trim().split(/\s+/)[1])/100000:guide?NaN:16667/100000;
+          return {id:props?.getAttribute('id'),name:props?.getAttribute('name'),preset:node.localName==='sp'?geom?.getAttribute('prst'):null,box,zOrder,rawRatio:adjustment,ratio:Math.max(0,Math.min(.5,adjustment))};
         });
         for(const shape of group.shapes){
           let candidates=records.filter(r=>r.id===String(shape.id)&&(sameBox(r,shape)?r.name===shape.name||r.zOrder===shape.zOrderPosition:!r.box&&r.name===shape.name));
@@ -258,33 +261,53 @@
           if(candidates.length!==1)candidates=records.filter(r=>sameBox(r,shape));
           if(candidates.length>1)candidates=candidates.filter(r=>r.zOrder===shape.zOrderPosition);
           if(candidates.length!==1)throw new Error('図形情報を照合できません。グループ内の図形は解除して再試行してください。');
-          if(candidates[0].preset==='roundRect')rounded.push(shape);
+          if(candidates[0].preset==='roundRect'){
+            if(!Number.isFinite(candidates[0].ratio))throw new Error('角の半径を読み取れませんでした。');
+            rounded.push(shape);geometry.set(shape,candidates[0]);
+          }
         }
       }
     }
     rounded.forEach(s=>s.adjustments.load('count'));if(rounded.length)await context.sync();
     if(rounded.some(s=>s.adjustments.count!==1))throw new Error('対応していない角丸設定が含まれています。');
-    return {shapes,rounded};
+    return {shapes,rounded,geometry};
   }
   async function captureRounding(){
-    const value=await PowerPoint.run(async context=>{
-      const {shapes,rounded}=await roundedSelection(context);
+    const captured=await PowerPoint.run(async context=>{
+      const {shapes,rounded,geometry}=await roundedSelection(context);
       if(shapes.length!==1||rounded.length!==1)throw new Error('基準の角丸四角形を1つだけ選択してください。');
       const result=rounded[0].adjustments.get(0);await context.sync();
       if(C.rounding(result.value)===null)throw new Error('角丸の設定を取得できません。');
-      return result.value;
+      const shape=rounded[0],short=Math.min(shape.width,shape.height),ratio=geometry.get(shape).ratio;
+      if(!Number.isFinite(short)||short<=0)throw new Error('図形の寸法を取得できません。');
+      const rawRatio=geometry.get(shape).rawRatio,scale=rawRatio>0?result.value/rawRatio:1;
+      if(!Number.isFinite(scale)||scale<=0)throw new Error('丸みの調整値と半径を対応づけられません。');
+      return {radius:ratio*short,scale};
     });
-    await register('roundings',value,$('rounding-name').value);
+    await refresh();await persist(C.add(palette,'roundings',captured.radius,$('rounding-name').value,{mode:'radius',scale:captured.scale}));
   }
-  async function applyRounding(value){
-    if(C.rounding(value)===null)throw new Error('角丸の設定が不正です。');
+  async function applyRounding(item){
+    if(item.mode!=='radius')throw new Error('旧設定には半径情報がありません。基準の角丸を再登録してください。');
+    const radius=item.value;
+    if(C.rounding(radius)===null)throw new Error('角丸の設定が不正です。');
     const result=await PowerPoint.run(async context=>{
-      const {shapes,rounded}=await roundedSelection(context);
+      const {shapes,rounded,geometry}=await roundedSelection(context);
       if(!rounded.length)throw new Error('角丸四角形を選択してください。');
-      rounded.forEach(s=>s.adjustments.set(0,value));await context.sync();
+      const values=rounded.map(shape=>{
+        const short=Math.min(shape.width,shape.height);
+        if(!Number.isFinite(short)||short<=0)throw new Error('図形の寸法を取得できません。');
+        if(radius>short/2+1e-7)throw new Error('登録した半径が収まらない図形があります。小さい丸みを登録してください。変更は行っていません。');
+        return {shape,short,current:shape.adjustments.get(0),ratio:geometry.get(shape).rawRatio};
+      });await context.sync();
+      const plans=values.map(o=>{
+        const scale=o.ratio>0?o.current.value/o.ratio:item.scale;
+        if(!Number.isFinite(scale)||scale<=0)throw new Error('丸みの調整値を計算できません。');
+        return {shape:o.shape,value:Math.min(.5,radius/o.short)*scale};
+      });
+      plans.forEach(p=>p.shape.adjustments.set(0,p.value));await context.sync();
       return {count:rounded.length,skipped:shapes.length-rounded.length};
     });
-    status(`${result.count}件の丸みを変更。${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
+    status(`${result.count}件の角半径を統一。${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
   }
   function writeSlide(blobPromise){
     if(typeof navigator==='undefined'||!navigator.clipboard||typeof navigator.clipboard.write!=='function'||typeof ClipboardItem==='undefined')throw new Error('画像コピー非対応');
