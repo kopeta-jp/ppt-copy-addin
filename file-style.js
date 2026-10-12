@@ -224,7 +224,7 @@
     if(!Office.context.requirements.isSetSupported('PowerPointApi','1.10'))throw new Error('角丸の操作にはPowerPointApi 1.10以上が必要です。');
     const shapes=await selection(context);
     const geometric=shapes.filter(s=>s.type==='GeometricShape');
-    geometric.forEach(s=>s.load('id,name'));await context.sync();
+    geometric.forEach(s=>s.load('id,name,width,height,left,top,rotation,zOrderPosition'));await context.sync();
     const rounded=[];
     if(geometric.length){
       if(typeof JSZip==='undefined')throw new Error('角丸判定用のファイルがありません。file-style-jszip.min.jsをアップしてください。');
@@ -233,7 +233,8 @@
       const owners=geometric.map(shape=>({shape,slide:shape.getParentSlide()}));
       owners.forEach(o=>o.slide.load('id'));await context.sync();
       const groups=new Map();for(const o of owners){if(!groups.has(o.slide.id))groups.set(o.slide.id,{slide:o.slide,shapes:[]});groups.get(o.slide.id).shapes.push(o.shape);}
-      const P='http://schemas.openxmlformats.org/presentationml/2006/main',A='http://schemas.openxmlformats.org/drawingml/2006/main';
+      const element=(node,name)=>Array.from(node.getElementsByTagName('*')).find(n=>n.localName===name);
+      const sameBox=(record,shape)=>record.box&&['left','top','width','height'].every(k=>Number.isFinite(shape[k])&&Math.abs(record.box[k]-shape[k])<=0.15);
       for(const group of groups.values()){
         const exported=group.slide.exportAsBase64();await context.sync();
         const zip=await JSZip.loadAsync(exported.value,{base64:true});
@@ -241,15 +242,22 @@
         if(files.length!==1)throw new Error('角丸の種類を確認できませんでした。');
         const xml=new DOMParser().parseFromString(await zip.file(files[0]).async('string'),'application/xml');
         if(xml.getElementsByTagName('parsererror').length)throw new Error('図形情報を読み込めませんでした。');
-        const tree=xml.getElementsByTagNameNS(P,'spTree')[0];
-        const records=tree?Array.from(tree.children).filter(n=>n.namespaceURI===P&&n.localName==='sp').map(node=>{
-          const props=node.getElementsByTagNameNS(P,'cNvPr')[0],geom=node.getElementsByTagNameNS(A,'prstGeom')[0];
-          return {id:props?.getAttribute('id'),name:props?.getAttribute('name'),preset:geom?.getAttribute('prst')};
-        }):[];
+        const tree=element(xml,'spTree');
+        // Strict OOXML and exported decks can use different namespaces/names/IDs.
+        // Use local names, then cross-check identity with unchanged geometry and stacking order.
+        const nodes=tree?Array.from(tree.childNodes).filter(n=>n.nodeType===1&&['sp','pic','graphicFrame','grpSp','cxnSp','contentPart'].includes(n.localName)):[];
+        const records=nodes.map((node,zOrder)=>{
+          const props=element(node,'cNvPr'),geom=element(node,'prstGeom'),transform=element(node,'xfrm');
+          const off=transform&&element(transform,'off'),ext=transform&&element(transform,'ext');
+          const box=off&&ext?{left:Number(off.getAttribute('x'))/12700,top:Number(off.getAttribute('y'))/12700,width:Number(ext.getAttribute('cx'))/12700,height:Number(ext.getAttribute('cy'))/12700}:null;
+          return {id:props?.getAttribute('id'),name:props?.getAttribute('name'),preset:node.localName==='sp'?geom?.getAttribute('prst'):null,box,zOrder};
+        });
         for(const shape of group.shapes){
-          let candidates=records.filter(r=>r.id===String(shape.id)&&r.name===shape.name);
-          if(candidates.length!==1)candidates=records.filter(r=>r.name===shape.name);
-          if(candidates.length!==1)throw new Error('図形を一意に識別できません。図形の名前を変えて再試行してください。');
+          let candidates=records.filter(r=>r.id===String(shape.id)&&(sameBox(r,shape)?r.name===shape.name||r.zOrder===shape.zOrderPosition:!r.box&&r.name===shape.name));
+          if(candidates.length!==1)candidates=records.filter(r=>r.name===shape.name&&sameBox(r,shape));
+          if(candidates.length!==1)candidates=records.filter(r=>sameBox(r,shape));
+          if(candidates.length>1)candidates=candidates.filter(r=>r.zOrder===shape.zOrderPosition);
+          if(candidates.length!==1)throw new Error('図形情報を照合できません。グループ内の図形は解除して再試行してください。');
           if(candidates[0].preset==='roundRect')rounded.push(shape);
         }
       }
