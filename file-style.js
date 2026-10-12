@@ -12,7 +12,7 @@
     finally{busy=false;controls();}
   }
   function render(){
-    for(const kind of ['colors','fonts','sizes','dimensions']){
+    for(const kind of ['colors','fonts','sizes','dimensions','roundings']){
       const list=$(kind);list.replaceChildren();
       if(!palette[kind].length){const p=document.createElement('p');p.className='hint';p.textContent='未登録';list.append(p);}
       palette[kind].forEach((item,index)=>{
@@ -22,7 +22,7 @@
         if(kind==='colors'){const swatch=document.createElement('span');swatch.className='swatch';swatch.style.backgroundColor=item.value;apply.append(swatch);}
         const text=document.createElement('span');text.className='label';text.textContent=item.label;
         const value=document.createElement('small');value.textContent=kind==='sizes'?`${item.value} pt`:kind==='dimensions'?`${item.value} cm`:item.value;
-        if(!['sizes','dimensions'].includes(kind)||item.label!==value.textContent)text.append(value);apply.append(text);
+        if(kind!=='roundings'&&(!['sizes','dimensions'].includes(kind)||item.label!==value.textContent))text.append(value);apply.append(text);
         if(kind==='colors'){
           const actions=document.createElement('div');actions.className='color-actions';
           for(const [target,label,icon] of [['text','文字','T'],['fill','塗り','■'],['line','線','□']]){
@@ -41,7 +41,7 @@
             button.addEventListener('click',()=>action(()=>applyDimension(item.value,axis)));actions.append(button);
           }
           apply.append(actions);
-        }else apply.addEventListener('click',()=>action(()=>applyStyle(kind,item.value)));
+        }else apply.addEventListener('click',()=>action(()=>kind==='roundings'?applyRounding(item.value):applyStyle(kind,item.value)));
         const remove=document.createElement('button');remove.className='delete';remove.textContent='削除';remove.setAttribute('aria-label',item.label+'を削除');
         remove.addEventListener('click',()=>action(async()=>{await refresh();const next=C.clean(palette);const at=next[kind].findIndex(x=>x.value===item.value);if(at>=0)next[kind].splice(at,1);await persist(next);}));
         entry.append(apply,remove);list.append(entry);
@@ -80,10 +80,10 @@
     await refresh();
     const merged=C.mergeStyles(palette,incoming);
     const a=merged.added;
-    if(a.colors+a.fonts+a.sizes+a.dimensions===0){status('すべて登録済みでした。登録情報は変更していません。','success');return;}
+    if(a.colors+a.fonts+a.sizes+a.dimensions+a.roundings===0){status('すべて登録済みでした。登録情報は変更していません。','success');return;}
     await persist(merged.palette);
     const large=C.bytes(merged.palette)>=C.warning;
-    status(`追加：色 ${a.colors}・フォント ${a.fonts}・サイズ ${a.sizes}・寸法 ${a.dimensions}。${large?'登録データが32 KBを超えています。':''} ⌘Sで保存。`,large?'warning':'success');
+    status(`追加：色 ${a.colors}・フォント ${a.fonts}・サイズ ${a.sizes}・寸法 ${a.dimensions}・角丸 ${a.roundings}。${large?'登録データが32 KBを超えています。':''} ⌘Sで保存。`,large?'warning':'success');
   }
   async function textTargets(context,shapes){
     const selected=context.presentation.getSelectedTextRangeOrNullObject();selected.load('text');await context.sync();
@@ -220,6 +220,64 @@
     });
     status(`${result.count}件の${axis==='width'?'横幅':'縦幅'}を${cm} cmに変更。${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
   }
+  async function roundedSelection(context){
+    if(!Office.context.requirements.isSetSupported('PowerPointApi','1.10'))throw new Error('角丸の操作にはPowerPointApi 1.10以上が必要です。');
+    const shapes=await selection(context);
+    const geometric=shapes.filter(s=>s.type==='GeometricShape');
+    geometric.forEach(s=>s.load('id,name'));await context.sync();
+    const rounded=[];
+    if(geometric.length){
+      if(typeof JSZip==='undefined')throw new Error('角丸判定用のファイルがありません。file-style-jszip.min.jsをアップしてください。');
+      // Office.js does not expose the preset geometry of an existing shape.
+      // Read the exported slide XML only; never import or replace the source shapes.
+      const owners=geometric.map(shape=>({shape,slide:shape.getParentSlide()}));
+      owners.forEach(o=>o.slide.load('id'));await context.sync();
+      const groups=new Map();for(const o of owners){if(!groups.has(o.slide.id))groups.set(o.slide.id,{slide:o.slide,shapes:[]});groups.get(o.slide.id).shapes.push(o.shape);}
+      const P='http://schemas.openxmlformats.org/presentationml/2006/main',A='http://schemas.openxmlformats.org/drawingml/2006/main';
+      for(const group of groups.values()){
+        const exported=group.slide.exportAsBase64();await context.sync();
+        const zip=await JSZip.loadAsync(exported.value,{base64:true});
+        const files=Object.keys(zip.files).filter(p=>/^ppt\/slides\/slide\d+\.xml$/.test(p));
+        if(files.length!==1)throw new Error('角丸の種類を確認できませんでした。');
+        const xml=new DOMParser().parseFromString(await zip.file(files[0]).async('string'),'application/xml');
+        if(xml.getElementsByTagName('parsererror').length)throw new Error('図形情報を読み込めませんでした。');
+        const tree=xml.getElementsByTagNameNS(P,'spTree')[0];
+        const records=tree?Array.from(tree.children).filter(n=>n.namespaceURI===P&&n.localName==='sp').map(node=>{
+          const props=node.getElementsByTagNameNS(P,'cNvPr')[0],geom=node.getElementsByTagNameNS(A,'prstGeom')[0];
+          return {id:props?.getAttribute('id'),name:props?.getAttribute('name'),preset:geom?.getAttribute('prst')};
+        }):[];
+        for(const shape of group.shapes){
+          let candidates=records.filter(r=>r.id===String(shape.id)&&r.name===shape.name);
+          if(candidates.length!==1)candidates=records.filter(r=>r.name===shape.name);
+          if(candidates.length!==1)throw new Error('図形を一意に識別できません。図形の名前を変えて再試行してください。');
+          if(candidates[0].preset==='roundRect')rounded.push(shape);
+        }
+      }
+    }
+    rounded.forEach(s=>s.adjustments.load('count'));if(rounded.length)await context.sync();
+    if(rounded.some(s=>s.adjustments.count!==1))throw new Error('対応していない角丸設定が含まれています。');
+    return {shapes,rounded};
+  }
+  async function captureRounding(){
+    const value=await PowerPoint.run(async context=>{
+      const {shapes,rounded}=await roundedSelection(context);
+      if(shapes.length!==1||rounded.length!==1)throw new Error('基準の角丸四角形を1つだけ選択してください。');
+      const result=rounded[0].adjustments.get(0);await context.sync();
+      if(C.rounding(result.value)===null)throw new Error('角丸の設定を取得できません。');
+      return result.value;
+    });
+    await register('roundings',value,$('rounding-name').value);
+  }
+  async function applyRounding(value){
+    if(C.rounding(value)===null)throw new Error('角丸の設定が不正です。');
+    const result=await PowerPoint.run(async context=>{
+      const {shapes,rounded}=await roundedSelection(context);
+      if(!rounded.length)throw new Error('角丸四角形を選択してください。');
+      rounded.forEach(s=>s.adjustments.set(0,value));await context.sync();
+      return {count:rounded.length,skipped:shapes.length-rounded.length};
+    });
+    status(`${result.count}件の丸みを変更。${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
+  }
   function writeSlide(blobPromise){
     if(typeof navigator==='undefined'||!navigator.clipboard||typeof navigator.clipboard.write!=='function'||typeof ClipboardItem==='undefined')throw new Error('画像コピー非対応');
     return navigator.clipboard.write([new ClipboardItem({'image/png':blobPromise})]);
@@ -259,6 +317,7 @@
   }
   document.addEventListener('DOMContentLoaded',()=>{
     audit=window.FileStyleAudit.create({status,action});
+    $('capture-rounding').addEventListener('click',()=>action(captureRounding));
     $('slide-copy').addEventListener('click',()=>action(copySlide));
     $('slide-retry').addEventListener('click',()=>action(retrySlide));
     $('picker').addEventListener('input',()=>{$('hex').value=$('picker').value.toUpperCase();});
