@@ -161,15 +161,15 @@
         const sizeTargets=kind==='sizes'?await textSizeTargets(context,ranges):[];
         const fit=sizeTargets.filter(item=>item.isTextBox);
         // Disable any previous shape-to-text fit before changing text size.
-        // Geometric shapes stay fixed; only actual text boxes get height fitting.
+        // Geometric shapes stay fixed; text boxes fit their unwrapped text in both dimensions.
         for(const item of sizeTargets)item.frame.autoSizeSetting='AutoSizeNone';
         for(const range of ranges){if(kind==='fonts')range.font.name=value;else if(kind==='sizes')range.font.size=value;else range.font.color=value;count++;}
-        for(const item of fit){item.frame.wordWrap=true;item.frame.autoSizeSetting='AutoSizeShapeToFitText';}
+        for(const item of fit){item.frame.wordWrap=false;item.frame.autoSizeSetting='AutoSizeShapeToFitText';}
         if(sizeTargets.length){
           await context.sync();
           for(const item of sizeTargets){
-            item.shape.width=item.width;item.shape.left=item.left;item.shape.top=item.top;
-            if(!item.isTextBox)item.shape.height=item.height;
+            item.shape.left=item.left;item.shape.top=item.top;
+            if(!item.isTextBox){item.shape.width=item.width;item.shape.height=item.height;}
           }
           heightFitCount=fit.length;
         }
