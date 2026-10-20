@@ -4,7 +4,7 @@
   let palette=C.clean(null), ready=false, busy=false, exportUrl=null, slideBlob=null, slideUrl=null, audit=null;
   const $=id=>document.getElementById(id);
   function status(message,type=''){ $('status').textContent=message;$('status').className=type; }
-  function controls(){document.querySelectorAll('button').forEach(b=>b.disabled=!ready||busy);$('slide-retry').disabled=!ready||busy||!slideBlob;if(audit)audit.controls(ready&&!busy);}
+  function controls(){document.querySelectorAll('button').forEach(b=>b.disabled=!ready||busy);for(const id of ['line-replace','round-replace'])$(id).disabled=!ready||busy;$('slide-retry').disabled=!ready||busy||!slideBlob;if(audit)audit.controls(ready&&!busy);}
   async function action(fn){
     if(!ready||busy)return;
     busy=true;controls();
@@ -12,7 +12,7 @@
     finally{busy=false;controls();}
   }
   function render(){
-    for(const kind of ['colors','fonts','sizes','dimensions','roundings']){
+    for(const kind of ['colors','fonts','sizes','lineSpacings','dimensions','roundings']){
       const list=$(kind);list.replaceChildren();
       if(!palette[kind].length){const p=document.createElement('p');p.className='hint';p.textContent='未登録';list.append(p);}
       palette[kind].forEach((item,index)=>{
@@ -23,7 +23,7 @@
         const text=document.createElement('span');text.className='label';text.textContent=item.label;
         if(kind==='roundings')text.textContent+=item.mode==='radius'?` · 半径 ${(item.value*25.4/72).toFixed(2)} mm`:'（旧・再登録）';
         const value=document.createElement('small');value.textContent=kind==='sizes'?`${item.value} pt`:kind==='dimensions'?`${item.value} cm`:item.value;
-        if(kind!=='roundings'&&(!['sizes','dimensions'].includes(kind)||item.label!==value.textContent))text.append(value);apply.append(text);
+        if(!['roundings','lineSpacings'].includes(kind)&&(!['sizes','dimensions'].includes(kind)||item.label!==value.textContent))text.append(value);apply.append(text);
         if(kind==='colors'){
           const actions=document.createElement('div');actions.className='color-actions';
           for(const [target,label,icon] of [['text','文字','T'],['fill','塗り','■'],['line','線','□']]){
@@ -42,7 +42,7 @@
             button.addEventListener('click',()=>action(()=>applyDimension(item.value,axis)));actions.append(button);
           }
           apply.append(actions);
-        }else apply.addEventListener('click',()=>action(()=>kind==='roundings'?applyRounding(item):applyStyle(kind,item.value)));
+        }else apply.addEventListener('click',()=>action(()=>kind==='roundings'?applyRounding(item):kind==='lineSpacings'?applyXml('line',item.value):applyStyle(kind,item.value)));
         const remove=document.createElement('button');remove.className='delete';remove.textContent='削除';remove.setAttribute('aria-label',item.label+'を削除');
         remove.addEventListener('click',()=>action(async()=>{await refresh();const next=C.clean(palette);const at=next[kind].findIndex(x=>x.value===item.value&&(kind!=='roundings'||x.mode===item.mode));if(at>=0)next[kind].splice(at,1);await persist(next);}));
         entry.append(apply,remove);list.append(entry);
@@ -81,10 +81,10 @@
     await refresh();
     const merged=C.mergeStyles(palette,incoming);
     const a=merged.added;
-    if(a.colors+a.fonts+a.sizes+a.dimensions+a.roundings===0){status('すべて登録済みでした。登録情報は変更していません。','success');return;}
+    if(a.colors+a.fonts+a.sizes+a.dimensions+a.roundings+a.lineSpacings===0){status('すべて登録済みでした。登録情報は変更していません。','success');return;}
     await persist(merged.palette);
     const large=C.bytes(merged.palette)>=C.warning;
-    status(`追加：色 ${a.colors}・フォント ${a.fonts}・サイズ ${a.sizes}・寸法 ${a.dimensions}・角丸 ${a.roundings}。${large?'登録データが32 KBを超えています。':''} ⌘Sで保存。`,large?'warning':'success');
+    status(`追加：色 ${a.colors}・フォント ${a.fonts}・サイズ ${a.sizes}・行間 ${a.lineSpacings}・寸法 ${a.dimensions}・角丸 ${a.roundings}。${large?'登録データが32 KBを超えています。':''} ⌘Sで保存。`,large?'warning':'success');
   }
   async function textTargets(context,shapes){
     const selected=context.presentation.getSelectedTextRangeOrNullObject();selected.load('text');await context.sync();
@@ -226,7 +226,7 @@
     const shapes=await selection(context);
     const geometric=shapes.filter(s=>s.type==='GeometricShape');
     geometric.forEach(s=>s.load('id,name,width,height,left,top,rotation,zOrderPosition'));await context.sync();
-    const rounded=[],geometry=new Map();
+    const rounded=[],rectangles=[],geometry=new Map();
     if(geometric.length){
       if(typeof JSZip==='undefined')throw new Error('角丸判定用のファイルがありません。file-style-jszip.min.jsをアップしてください。');
       // Office.js does not expose the preset geometry of an existing shape.
@@ -261,6 +261,7 @@
           if(candidates.length!==1)candidates=records.filter(r=>sameBox(r,shape));
           if(candidates.length>1)candidates=candidates.filter(r=>r.zOrder===shape.zOrderPosition);
           if(candidates.length!==1)throw new Error('図形情報を照合できません。グループ内の図形は解除して再試行してください。');
+          if(candidates[0].preset==='rect')rectangles.push(shape);
           if(candidates[0].preset==='roundRect'){
             if(!Number.isFinite(candidates[0].ratio))throw new Error('角の半径を読み取れませんでした。');
             rounded.push(shape);geometry.set(shape,candidates[0]);
@@ -270,7 +271,7 @@
     }
     rounded.forEach(s=>s.adjustments.load('count'));if(rounded.length)await context.sync();
     if(rounded.some(s=>s.adjustments.count!==1))throw new Error('対応していない角丸設定が含まれています。');
-    return {shapes,rounded,geometry};
+    return {shapes,rounded,rectangles,geometry};
   }
   async function captureRounding(){
     const captured=await PowerPoint.run(async context=>{
@@ -291,7 +292,8 @@
     const radius=item.value;
     if(C.rounding(radius)===null)throw new Error('角丸の設定が不正です。');
     const result=await PowerPoint.run(async context=>{
-      const {shapes,rounded,geometry}=await roundedSelection(context);
+      const {shapes,rounded,rectangles,geometry}=await roundedSelection(context);
+      if(rectangles.length)return {convert:true};
       if(!rounded.length)throw new Error('角丸四角形を選択してください。');
       const values=rounded.map(shape=>{
         const short=Math.min(shape.width,shape.height);
@@ -307,7 +309,29 @@
       plans.forEach(p=>p.shape.adjustments.set(0,p.value));await context.sync();
       return {count:rounded.length,skipped:shapes.length-rounded.length};
     });
+    if(result.convert){await applyXml('round',radius);return;}
     status(`${result.count}件の角半径を統一。${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
+  }
+  async function applyXml(kind,value){
+    const replace=$(kind==='line'?'line-replace':'round-replace').checked;
+    const result=await window.FileStyleXml.apply({kind,value},{replace,status});
+    status(`${result.count}件を${replace?'反映':'変更済みコピーに反映'}。${result.slides}スライド。リンクは引き継ぎ対象外です。`,'warning');
+  }
+  async function fitToSlide(){
+    if(!Office.context.requirements.isSetSupported('PowerPointApi','1.10'))throw new Error('スライドサイズの取得にはPowerPointApi 1.10以上が必要です。');
+    const result=await PowerPoint.run(async context=>{
+      const page=context.presentation.pageSetup;page.load('slideWidth,slideHeight');
+      const shapes=await selection(context);
+      if(!Number.isFinite(page.slideWidth)||!Number.isFinite(page.slideHeight)||page.slideWidth<=0||page.slideHeight<=0)throw new Error('スライドサイズを取得できません。');
+      const targets=shapes.filter(s=>['Image','GeometricShape','TextBox','Group'].includes(s.type));
+      if(!targets.length)throw new Error('画像または図形を選択してください。');
+      const frames=targets.filter(s=>['GeometricShape','TextBox'].includes(s.type)).map(s=>s.getTextFrameOrNullObject());
+      frames.forEach(f=>f.load('hasText'));if(frames.length)await context.sync();
+      frames.filter(f=>!f.isNullObject).forEach(f=>f.autoSizeSetting='AutoSizeNone');
+      for(const shape of targets){shape.width=page.slideWidth;shape.height=page.slideHeight;shape.left=0;shape.top=0;}
+      await context.sync();return {count:targets.length,skipped:shapes.length-targets.length};
+    });
+    status(`${result.count}件をスライド全面に合わせました。${result.skipped?` 対象外：${result.skipped}件。`:''}`,'success');
   }
   function writeSlide(blobPromise){
     if(typeof navigator==='undefined'||!navigator.clipboard||typeof navigator.clipboard.write!=='function'||typeof ClipboardItem==='undefined')throw new Error('画像コピー非対応');
@@ -348,6 +372,7 @@
   }
   document.addEventListener('DOMContentLoaded',()=>{
     audit=window.FileStyleAudit.create({status,action});
+    $('fit-to-slide').addEventListener('click',()=>action(fitToSlide));
     $('capture-rounding').addEventListener('click',()=>action(captureRounding));
     $('slide-copy').addEventListener('click',()=>action(copySlide));
     $('slide-retry').addEventListener('click',()=>action(retrySlide));
@@ -357,6 +382,7 @@
     $('font-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('fonts',$('font-name').value,$('font-label').value));});
     $('size-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('sizes',$('font-size').value,''));});
     $('dimension-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('dimensions',$('dimension-value').value,''));});
+    $('line-form').addEventListener('submit',e=>{e.preventDefault();action(()=>register('lineSpacings',$('line-value').value,''));});
     $('capture-color').addEventListener('click',()=>action(()=>capture('colors')));
     $('capture-font').addEventListener('click',()=>action(()=>capture('fonts')));
     $('capture-size').addEventListener('click',()=>action(()=>capture('sizes')));
