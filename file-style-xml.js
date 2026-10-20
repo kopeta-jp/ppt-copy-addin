@@ -20,7 +20,7 @@
     return found[0];
   }
   async function transform(base64,targets,operation){
-    if(!['line','round'].includes(operation.kind)||!Number.isFinite(operation.value)||(operation.kind==='line'?(operation.value<.1||operation.value>10):operation.value<0))throw new Error('指定値が不正です。');
+    if(operation.kind!=='round'||!Number.isFinite(operation.value)||operation.value<0)throw new Error('指定値が不正です。');
     const zip=await JSZip.loadAsync(base64,{base64:true}),paths=Object.keys(zip.files).filter(p=>/^ppt\/slides\/slide\d+\.xml$/.test(p));
     if(paths.length!==1)throw new Error('1スライドずつ処理してください。');
     const doc=parse(await zip.file(paths[0]).async('string')),list=records(doc),checks=[];let skipped=0;
@@ -28,22 +28,7 @@
     for(const target of targets){
       const r=match(list,target);if(seen.has(r.order))continue;seen.add(r.order);
       const node=r.node,body=child(node,'txBody'),props=child(node,'spPr'),geom=props&&child(props,'prstGeom');
-      if(operation.kind==='line'){
-        if(!body){skipped++;continue;}
-        const paragraphs=Array.from(body.childNodes).filter(n=>n.nodeType===1&&n.localName==='p');
-        if(!paragraphs.length){skipped++;continue;}
-        let offset=0;const changedParagraphs=[];
-        for(let pi=0;pi<paragraphs.length;pi++){
-          const p=paragraphs[pi],length=descendants(p,'t').reduce((n,t)=>n+t.textContent.length,0)+descendants(p,'br').length;
-          const intersects=!target.span||target.span.start<offset+length+1&&target.span.start+target.span.length>offset;
-          offset+=length+1;if(!intersects)continue;changedParagraphs.push(pi);
-          const ns=p.namespaceURI,prefix=p.prefix||'a',make=name=>doc.createElementNS(ns,`${prefix}:${name}`);
-          let pPr=child(p,'pPr');if(!pPr){pPr=make('pPr');p.insertBefore(pPr,p.firstChild);}
-          for(const n of Array.from(pPr.childNodes))if(n.nodeType===1&&n.localName==='lnSpc')pPr.removeChild(n);
-          const spacing=make('lnSpc'),percent=make('spcPct');percent.setAttribute('val',String(Math.round(operation.value*100000)));spacing.appendChild(percent);pPr.insertBefore(spacing,pPr.firstChild);
-        }
-        if(changedParagraphs.length)checks.push({order:r.order,kind:'line',paragraphs:changedParagraphs,value:Math.round(operation.value*100000),text:descendants(body,'t').map(n=>n.textContent).join('')});
-      }else{
+      {
         if(!geom||!['rect','roundRect'].includes(geom.getAttribute('prst'))){skipped++;continue;}
         const short=Math.min(r.box.width,r.box.height);
         if(operation.value>short/2+1e-7)throw new Error('登録半径が収まらない図形があります。小さい半径を登録してください。');
@@ -55,7 +40,7 @@
         checks.push({order:r.order,kind:'round',value:adjustment,text:body?descendants(body,'t').map(n=>n.textContent).join(''):''});
       }
     }
-    if(!checks.length)throw new Error(operation.kind==='line'?'文字のある図形を選択してください。':'四角形または角丸四角形を選択してください。');
+    if(!checks.length)throw new Error('四角形または角丸四角形を選択してください。');
     zip.file(paths[0],new XMLSerializer().serializeToString(doc));
     // Keep unrelated ZIP members untouched. Hyperlink validation/remapping is out of scope.
     return {base64:await zip.generateAsync({type:'base64',compression:'DEFLATE'}),checks,count:checks.length,skipped};
@@ -68,30 +53,22 @@
       const node=list.find(r=>r.order===check.order)?.node;if(!node)throw new Error('挿入後の図形がありません。');
       const text=descendants(child(node,'txBody')||node,'t').map(n=>n.textContent).join('');
       if(text!==check.text)throw new Error('挿入後の文字が一致しません。');
-      if(check.kind==='line'){
-        const paragraphs=Array.from(child(node,'txBody').childNodes).filter(n=>n.nodeType===1&&n.localName==='p');
-        if((check.paragraphs||paragraphs.map((_,i)=>i)).some(i=>+descendants(child(paragraphs[i],'pPr'),'spcPct')[0]?.getAttribute('val')!==check.value))throw new Error('行間の反映を確認できません。');
-      }else{
+      {
         const geom=descendants(child(node,'spPr'),'prstGeom')[0],gd=geom&&descendants(geom,'gd').find(n=>n.getAttribute('name')==='adj');
         if(geom?.getAttribute('prst')!=='roundRect'||gd?.getAttribute('fmla')!==`val ${check.value}`)throw new Error('角丸の反映を確認できません。');
       }
     }
   }
   async function apply(operation,{replace=false,status=()=>{}}={}){
+    if(operation.kind!=='round')throw new Error('この操作は対応していません。');
     if(!Office.context.requirements.isSetSupported('PowerPointApi','1.8'))throw new Error('PowerPointApi 1.8以上が必要です。');
     return PowerPoint.run(async context=>{
       const selected=context.presentation.getSelectedShapes();selected.load('items/id,items/name,items/type,items/left,items/top,items/width,items/height,items/zOrderPosition');await context.sync();
-      let targets=selected.items.filter(s=>['TextBox','GeometricShape','Placeholder'].includes(s.type)),span=null;
-      if(operation.kind==='line'&&typeof context.presentation.getSelectedTextRangeOrNullObject==='function'){
-        const range=context.presentation.getSelectedTextRangeOrNullObject();range.load('text,start,length');await context.sync();
-        if(!range.isNullObject&&range.text.length){
-          const shape=range.getParentTextFrame().getParentShape();shape.load('id,name,type,left,top,width,height,zOrderPosition');await context.sync();targets=[shape];span={start:range.start,length:range.length};
-        }
-      }
+      const targets=selected.items.filter(s=>['GeometricShape'].includes(s.type));
       if(!targets.length)throw new Error('文字のある図形または四角形を選択してください。');
       const owners=targets.map(shape=>({shape,slide:shape.getParentSlide()}));owners.forEach(o=>o.slide.load('id'));await context.sync();
       const groups=new Map();for(const o of owners){if(!groups.has(o.slide.id))groups.set(o.slide.id,{slide:o.slide,targets:[]});
-        const meta={span};for(const key of ['id','name','type','left','top','width','height','zOrderPosition'])meta[key]=o.shape[key];groups.get(o.slide.id).targets.push(meta);
+        const meta={};for(const key of ['id','name','type','left','top','width','height','zOrderPosition'])meta[key]=o.shape[key];groups.get(o.slide.id).targets.push(meta);
       }
       const prepared=[];let completed=0;
       // Preflight all target slides before any insertion or deletion.
